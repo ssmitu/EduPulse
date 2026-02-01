@@ -21,7 +21,6 @@ namespace EduPulse.API.DTOs
         public int DepartmentId { get; set; }
 
         // Optional fields based on role
-        // Update these fields in your RegisterDto.cs
         [Range(1, 4, ErrorMessage = "Year must be between 1 and 4.")]
         public int? Year { get; set; }
 

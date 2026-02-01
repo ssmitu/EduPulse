@@ -3,6 +3,7 @@ using EduPulse.API.DTOs;
 using EduPulse.API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using BCrypt.Net;
 
 namespace EduPulse.API.Controllers
 {
@@ -75,7 +76,8 @@ namespace EduPulse.API.Controllers
             {
                 Name = dto.Name,
                 Email = dto.Email,
-                PasswordHash = dto.Password, // Hashing to be added later
+                // This encrypts the password
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = Enum.Parse<UserRole>(dto.Role),
                 DepartmentId = dto.DepartmentId,
                 CurrentSemester = flatSemester,
@@ -91,21 +93,24 @@ namespace EduPulse.API.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
         {
+            // 1. Find user by email (only define 'var user' ONCE)
             var user = await _context.Users
                 .Include(u => u.Department)
                 .FirstOrDefaultAsync(u => u.Email == dto.Email);
 
-            if (user == null || user.PasswordHash != dto.Password)
+            // 2. Check if user exists AND verify the BCrypt hash
+            if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             {
                 return Unauthorized("Invalid email or password.");
             }
 
+            // 3. Check verification status
             if (!user.IsVerified)
             {
                 return BadRequest("Your account is pending approval by the Admin.");
             }
 
-            // Convert Flat Semester (1-8) back to Year/Semester for the Frontend
+            // 4. Success - Convert for Frontend
             int? displayYear = user.CurrentSemester.HasValue ? (user.CurrentSemester.Value + 1) / 2 : null;
             int? displaySemester = user.CurrentSemester.HasValue ? (user.CurrentSemester.Value % 2 == 0 ? 2 : 1) : null;
 
@@ -120,6 +125,7 @@ namespace EduPulse.API.Controllers
                 Semester = displaySemester
             });
         }
+
         [HttpGet("pending-teachers")]
         public async Task<IActionResult> GetPendingTeachers()
         {
