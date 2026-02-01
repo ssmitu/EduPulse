@@ -9,7 +9,11 @@ namespace EduPulse.API.Controllers
     public class DepartmentsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        public DepartmentsController(ApplicationDbContext context) => _context = context;
+
+        public DepartmentsController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
 
         [HttpGet]
         public async Task<IActionResult> GetDepartments()
