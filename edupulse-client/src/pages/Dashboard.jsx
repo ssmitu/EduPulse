@@ -1,46 +1,124 @@
-import { useContext } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import API from '../api/axios';
 
 const Dashboard = () => {
     const { user, logout } = useContext(AuthContext);
+    const [pendingTeachers, setPendingTeachers] = useState([]);
     const navigate = useNavigate();
+
+    const approveTeacher = async (id) => {
+        try {
+            await API.post(`/Auth/approve-teacher/${id}`);
+            setPendingTeachers(prev => prev.filter(t => t.id !== id));
+            alert("Teacher Approved Successfully!");
+        } catch (error) {
+            console.error(error);
+            alert("Approval failed.");
+        }
+    };
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
+    useEffect(() => {
+        if (user?.role !== 'Admin') return;
+
+        let isMounted = true;
+
+        const fetchPendingTeachers = async () => {
+            try {
+                const response = await API.get('/Auth/pending-teachers');
+                if (isMounted) {
+                    setPendingTeachers(response.data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch teachers:", error);
+            }
+        };
+
+        fetchPendingTeachers();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [user]);
+
+    if (!user) {
+        return <div className="dashboard-container">Loading...</div>;
+    }
+
     return (
-        <div style={{ padding: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eee' }}>
-                <h1>EduPulse Dashboard</h1>
-                <button onClick={handleLogout} style={{ padding: '10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
+        <div className="dashboard-container">
+            <div className="header-strip">
+                <h1>EduPulse</h1>
+                <button onClick={handleLogout} className="btn-logout">
                     Logout
                 </button>
             </div>
 
-            <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '10px', color: 'black' }}>
+            <div className="user-info-card">
                 <h2>Welcome, {user.name}!</h2>
                 <p><strong>Email:</strong> {user.email}</p>
                 <p><strong>Role:</strong> {user.role}</p>
                 <p><strong>Department:</strong> {user.department}</p>
 
                 {user.role === 'Student' && (
-                    <p><strong>Current Standing:</strong> Year {user.year}, Semester {user.semester}</p>
+                    <p>
+                        <strong>Standing:</strong> Year {user.year}, Semester {user.semester}
+                    </p>
                 )}
             </div>
 
-            <div style={{ marginTop: '20px' }}>
-                {/* We will add role-specific buttons here in the next step */}
-                {user.role === 'Admin' && <button style={actionBtn}>Manage Teachers</button>}
-                {user.role === 'Teacher' && <button style={actionBtn}>Create New Course</button>}
-                {user.role === 'Student' && <button style={actionBtn}>View My Grades</button>}
+            {user.role === 'Admin' && (
+                <div className="admin-section">
+                    <h3>Pending Teacher Approvals</h3>
+
+                    {pendingTeachers.length === 0 ? (
+                        <p>No pending teachers to approve at this time.</p>
+                    ) : (
+                        <table className="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {pendingTeachers.map(t => (
+                                    <tr key={t.id}>
+                                        <td>{t.name}</td>
+                                        <td>{t.email}</td>
+                                        <td>
+                                            <button
+                                                onClick={() => approveTeacher(t.id)}
+                                                className="btn-approve"
+                                            >
+                                                Approve
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
+            <div className="action-area">
+                {user.role === 'Teacher' && (
+                    <button className="btn-action">Create New Course</button>
+                )}
+                {user.role === 'Student' && (
+                    <button className="btn-action">View My Grades</button>
+                )}
             </div>
         </div>
     );
 };
-
-const actionBtn = { padding: '15px 30px', margin: '10px', fontSize: '16px', cursor: 'pointer', borderRadius: '8px', border: '1px solid #007bff', backgroundColor: 'white', color: '#007bff' };
 
 export default Dashboard;

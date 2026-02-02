@@ -9,16 +9,19 @@ builder.Services.AddControllers();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
-        policy => policy.WithOrigins("http://localhost:5173") // Your React URL
+        policy => policy.WithOrigins("http://localhost:5173")
                         .AllowAnyMethod()
                         .AllowAnyHeader());
 });
 
-// Add Database Service
+// Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    )
+);
 
-// These lines enable the Swagger UI we want
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -29,22 +32,21 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<ApplicationDbContext>();
-    DbSeeder.Seed(context);
+    var configuration = services.GetRequiredService<IConfiguration>();
+
+    DbSeeder.Seed(context, configuration);
 }
 
 // 3. Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    // These two lines turn on the visual interface
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
 app.UseCors("AllowReactApp");
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
