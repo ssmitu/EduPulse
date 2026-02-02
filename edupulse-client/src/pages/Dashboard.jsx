@@ -111,10 +111,18 @@ const Dashboard = () => {
 
             <div className="action-area">
                 {user.role === 'Teacher' && (
-                    <button className="btn-action">Create New Course</button>
+                    <button
+                        className="btn-action"
+                        onClick={() => navigate('/teacher-courses')}
+                    >
+                        Manage My Courses
+                    </button>
                 )}
+
                 {user.role === 'Student' && (
-                    <button className="btn-action">View My Grades</button>
+                    <button className="btn-action">
+                        View My Grades
+                    </button>
                 )}
             </div>
         </div>
