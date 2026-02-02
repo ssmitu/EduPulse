@@ -1,10 +1,14 @@
 ﻿using EduPulse.API.Models;
+using Microsoft.Extensions.Configuration;
 
 namespace EduPulse.API.Data
 {
     public static class DbSeeder
     {
-        public static void Seed(ApplicationDbContext context)
+        public static void Seed(
+            ApplicationDbContext context,
+            IConfiguration configuration
+        )
         {
             // 1. Seed Departments if empty
             if (!context.Departments.Any())
@@ -16,6 +20,7 @@ namespace EduPulse.API.Data
                     new Department { Name = "ME", TeacherVerificationKey = "ME_AUST_2025" },
                     new Department { Name = "CE", TeacherVerificationKey = "CE_AUST_2025" }
                 };
+
                 context.Departments.AddRange(depts);
                 context.SaveChanges();
             }
@@ -23,16 +28,24 @@ namespace EduPulse.API.Data
             // 2. Seed Admin User if empty
             if (!context.Users.Any(u => u.Role == UserRole.Admin))
             {
-                var adminDept = context.Departments.First(); // Just link to first dept
+                var adminEmail = configuration["InitialAdmin:Email"];
+                var adminPass = configuration["InitialAdmin:Password"];
+                var adminName = configuration["InitialAdmin:Name"];
+
+                var adminDept = context.Departments.First();
+
                 var admin = new User
                 {
-                    Name = "Super Admin",
-                    Email = "admin@edupulse.com",
-                    PasswordHash = "admin123", // We will add encryption later
+                    Name = adminName ?? "Admin",
+                    Email = adminEmail ?? "admin@edupulse.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+                        adminPass ?? "DefaultPass123!"
+                    ),
                     Role = UserRole.Admin,
                     IsVerified = true,
                     DepartmentId = adminDept.Id
                 };
+
                 context.Users.Add(admin);
                 context.SaveChanges();
             }

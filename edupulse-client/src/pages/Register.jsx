@@ -12,64 +12,118 @@ const Register = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Fetch departments for the dropdown
         API.get('/Departments').then(res => setDepartments(res.data));
     }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
+        // Prepare the data to send
+        const payload = {
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            role: formData.role,
+            departmentId: parseInt(formData.departmentId) // Ensure this is a number
+        };
+
+        // ONLY add year/sem for students, and ONLY add key for teachers
+        if (formData.role === 'Student') {
+            payload.year = parseInt(formData.year);
+            payload.semester = parseInt(formData.semester);
+        } else {
+            payload.verificationKey = formData.verificationKey;
+        }
+
         try {
-            await API.post('/Auth/register', formData);
+            await API.post('/Auth/register', payload);
             alert("Registration Successful! You can now login.");
             navigate('/login');
         } catch (err) {
-            setError(err.response?.data || "Registration failed.");
+            // FIX: Handle both string and object errors from Backend
+            const backendError = err.response?.data;
+            if (typeof backendError === 'string') {
+                setError(backendError);
+            } else if (backendError?.errors) {
+                // If it's a validation object, get the first error message
+                const firstErrorKey = Object.keys(backendError.errors)[0];
+                setError(backendError.errors[firstErrorKey][0]);
+            } else {
+                setError("Registration failed. Please check your data.");
+            }
         }
     };
 
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
-            <form onSubmit={handleSubmit} style={{ width: '400px', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-                <h2>EduPulse Sign Up</h2>
-                {error && <p style={{ color: 'red' }}>{error}</p>}
+        <div className="auth-wrapper">
+            <div className="auth-card" style={{ width: '400px' }}>
+                <form onSubmit={handleSubmit}>
+                    <h2>EduPulse Sign Up</h2>
 
-                <input placeholder="Full Name" onChange={e => setFormData({ ...formData, name: e.target.value })} required style={inputStyle} />
-                <input type="email" placeholder="Email" onChange={e => setFormData({ ...formData, email: e.target.value })} required style={inputStyle} />
-                <input type="password" placeholder="Password" onChange={e => setFormData({ ...formData, password: e.target.value })} required style={inputStyle} />
+                    {/* Error display fix */}
+                    {error && <div className="error-msg">{error}</div>}
 
-                <label>Role:</label>
-                <select onChange={e => setFormData({ ...formData, role: e.target.value })} style={inputStyle}>
-                    <option value="Student">Student</option>
-                    <option value="Teacher">Teacher</option>
-                </select>
+                    <div className="form-group">
+                        <label>Full Name</label>
+                        <input className="form-input" onChange={e => setFormData({ ...formData, name: e.target.value })} required />
+                    </div>
 
-                <label>Department:</label>
-                <select onChange={e => setFormData({ ...formData, departmentId: e.target.value })} required style={inputStyle}>
-                    <option value="">Select Department</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                </select>
+                    <div className="form-group">
+                        <label>Email</label>
+                        <input type="email" className="form-input" onChange={e => setFormData({ ...formData, email: e.target.value })} required />
+                    </div>
 
-                {/* Conditional Fields for Students */}
-                {formData.role === 'Student' && (
-                    <>
-                        <input type="number" placeholder="Year (1-4)" min="1" max="4" onChange={e => setFormData({ ...formData, year: e.target.value })} required style={inputStyle} />
-                        <input type="number" placeholder="Semester (1-2)" min="1" max="2" onChange={e => setFormData({ ...formData, semester: e.target.value })} required style={inputStyle} />
-                    </>
-                )}
+                    <div className="form-group">
+                        <label>Password</label>
+                        <input type="password" className="form-input" onChange={e => setFormData({ ...formData, password: e.target.value })} required />
+                    </div>
 
-                {/* Conditional Field for Teachers */}
-                {formData.role === 'Teacher' && (
-                    <input type="password" placeholder="Departmental Secret Key" onChange={e => setFormData({ ...formData, verificationKey: e.target.value })} required style={inputStyle} />
-                )}
+                    <div className="form-group">
+                        <label>Role</label>
+                        <select className="form-input" value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}>
+                            <option value="Student">Student</option>
+                            <option value="Teacher">Teacher</option>
+                        </select>
+                    </div>
 
-                <button type="submit" style={btnStyle}>Sign Up</button>
-            </form>
+                    <div className="form-group">
+                        <label>Department</label>
+                        <select className="form-input" onChange={e => setFormData({ ...formData, departmentId: e.target.value })} required>
+                            <option value="">Select Department</option>
+                            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                        </select>
+                    </div>
+
+                    {formData.role === 'Student' && (
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <div className="form-group">
+                                <label>Year</label>
+                                <input type="number" className="form-input" min="1" max="4" onChange={e => setFormData({ ...formData, year: e.target.value })} required />
+                            </div>
+                            <div className="form-group">
+                                <label>Semester</label>
+                                <input type="number" className="form-input" min="1" max="2" onChange={e => setFormData({ ...formData, semester: e.target.value })} required />
+                            </div>
+                        </div>
+                    )}
+
+                    {formData.role === 'Teacher' && (
+                        <div className="form-group">
+                            <label>Secret Key</label>
+                            <input type="password" placeholder="Departmental Key" className="form-input" onChange={e => setFormData({ ...formData, verificationKey: e.target.value })} required />
+                        </div>
+                    )}
+
+                    <button type="submit" className="btn-primary" style={{ backgroundColor: '#28a745' }}>Sign Up</button>
+
+                    <p style={{ textAlign: 'center', marginTop: '15px', fontSize: '0.85em' }}>
+                        Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#007bff', cursor: 'pointer' }}>Login</span>
+                    </p>
+                </form>
+            </div>
         </div>
     );
 };
-
-const inputStyle = { width: '100%', padding: '8px', marginBottom: '15px', display: 'block' };
-const btnStyle = { width: '100%', padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' };
 
 export default Register;

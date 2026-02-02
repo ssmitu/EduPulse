@@ -17,52 +17,52 @@ const Login = () => {
 
         try {
             const response = await API.post('/Auth/login', { email, password });
-
-            // This calls the login function in our AuthContext
-            // It saves the token and user data to localStorage
             login(response.data, response.data.token);
-
-            alert("Login Successful!");
             navigate('/dashboard');
         } catch (err) {
-            // This catches the "Invalid password" or "Pending approval" errors from your API
             setError(err.response?.data || "Login failed. Please try again.");
         }
     };
 
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '100px' }}>
-            <form onSubmit={handleSubmit} style={{ width: '300px', padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
-                <h2>EduPulse Login</h2>
+        <div className="auth-wrapper">
+            <div className="auth-card">
+                <form onSubmit={handleSubmit}>
+                    <h2>EduPulse Login</h2>
 
-                {error && <p style={{ color: 'red' }}>{error}</p>}
+                    {error && <div className="error-msg">{error}</div>}
 
-                <div style={{ marginBottom: '10px' }}>
-                    <label>Email:</label>
-                    <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                    />
-                </div>
+                    <div className="form-group">
+                        <label>Email</label>
+                        <input
+                            type="email"
+                            className="form-input"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                    </div>
 
-                <div style={{ marginBottom: '20px' }}>
-                    <label>Password:</label>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                    />
-                </div>
+                    <div className="form-group">
+                        <label>Password</label>
+                        <input
+                            type="password"
+                            className="form-input"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                    </div>
 
-                <button type="submit" style={{ width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                    Login
-                </button>
-            </form>
+                    <button type="submit" className="btn-primary">
+                        Login
+                    </button>
+
+                    <p style={{ textAlign: 'center', marginTop: '15px', fontSize: '0.85em' }}>
+                        Don't have an account? <span onClick={() => navigate('/register')} style={{ color: '#007bff', cursor: 'pointer' }}>Sign Up</span>
+                    </p>
+                </form>
+            </div>
         </div>
     );
 };
