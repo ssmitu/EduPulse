@@ -26,7 +26,8 @@ namespace EduPulse.API.Controllers
         {
             var courses = await _context.Courses
                 .Include(c => c.TargetDept)
-                .Select(c => new {
+                .Select(c => new
+                {
                     c.Id,
                     c.Title,
                     c.Code,
@@ -48,6 +49,7 @@ namespace EduPulse.API.Controllers
             // Extract Teacher ID from the JWT Token
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null) return Unauthorized();
+
             int teacherId = int.Parse(userIdClaim.Value);
 
             int flatSemester = ((dto.Year - 1) * 2) + dto.Semester;
@@ -100,6 +102,59 @@ namespace EduPulse.API.Controllers
 
             await _context.SaveChangesAsync();
             return Ok(new { message = $"Successfully synced! {enrolledCount} students enrolled." });
+        }
+
+        // 4. GET: Enrolled students for a course
+        [HttpGet("{courseId}/students")]
+        public async Task<IActionResult> GetEnrolledStudents(int courseId)
+        {
+            var students = await _context.Enrollments
+                .Where(e => e.CourseId == courseId)
+                .Include(e => e.Student)
+                .Select(e => new
+                {
+                    e.StudentId,
+                    e.Student!.Name,
+                    e.Student.Email,
+                    e.Status // Regular or Retake
+                })
+                .ToListAsync();
+
+            return Ok(students);
+        }
+
+        // 5. POST: Manually enroll a student (Irregular / Retake)
+        [HttpPost("{courseId}/enroll-manual")]
+        public async Task<IActionResult> EnrollManual(int courseId, [FromBody] string studentEmail)
+        {
+            var student = await _context.Users
+                .FirstOrDefaultAsync(u =>
+                    u.Email == studentEmail &&
+                    u.Role == UserRole.Student
+                );
+
+            if (student == null)
+                return NotFound("Student not found with that email.");
+
+            bool exists = await _context.Enrollments
+                .AnyAsync(e => e.CourseId == courseId && e.StudentId == student.Id);
+
+            if (exists)
+                return BadRequest("Student is already enrolled.");
+
+            _context.Enrollments.Add(new Enrollment
+            {
+                CourseId = courseId,
+                StudentId = student.Id,
+                Status = "Retake"
+            });
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = $"{student.Name} enrolled as Irregular/Retake student."
+            });
         }
     }
 }

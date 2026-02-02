@@ -4,16 +4,17 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const TeacherCourses = () => {
-    const { user } = useContext(AuthContext);
+    useContext(AuthContext); // Keep context call without using 'user' to avoid ESLint error
     const [courses, setCourses] = useState([]);
-    const [newCourse, setNewCourse] = useState({ title: '', code: '', targetDeptId: '', year: '', semester: '' });
+    const [newCourse, setNewCourse] = useState({
+        title: '',
+        code: '',
+        targetDeptId: '',
+        year: '',
+        semester: ''
+    });
     const [departments, setDepartments] = useState([]);
     const navigate = useNavigate();
-
-    useEffect(() => {
-        fetchCourses();
-        API.get('/Departments').then(res => setDepartments(res.data));
-    }, []);
 
     const fetchCourses = async () => {
         try {
@@ -24,14 +25,36 @@ const TeacherCourses = () => {
         }
     };
 
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                const coursesRes = await API.get('/Courses');
+                setCourses(coursesRes.data);
+
+                const departmentsRes = await API.get('/Departments');
+                setDepartments(departmentsRes.data);
+            } catch (err) {
+                console.error("Error loading data", err);
+            }
+        };
+
+        loadData();
+    }, []);
+
     const handleCreate = async (e) => {
         e.preventDefault();
         try {
             await API.post('/Courses', newCourse);
             alert("Course Created!");
-            setNewCourse({ title: '', code: '', targetDeptId: '', year: '', semester: '' }); // Clear form
+            setNewCourse({
+                title: '',
+                code: '',
+                targetDeptId: '',
+                year: '',
+                semester: ''
+            });
             fetchCourses();
-        } catch (err) {
+        } catch {
             alert("Error creating course");
         }
     };
@@ -40,7 +63,7 @@ const TeacherCourses = () => {
         try {
             const res = await API.post(`/Courses/sync/${id}`);
             alert(res.data.message);
-        } catch (err) {
+        } catch {
             alert("Sync failed");
         }
     };
@@ -48,25 +71,90 @@ const TeacherCourses = () => {
     return (
         <div className="dashboard-container">
             <div className="header-strip">
-                <button onClick={() => navigate('/dashboard')} className="btn-action">← Back to Dashboard</button>
+                <button
+                    onClick={() => navigate('/dashboard')}
+                    className="btn-action"
+                >
+                    ← Back to Dashboard
+                </button>
                 <h2>Manage Your Courses</h2>
             </div>
 
-            <form onSubmit={handleCreate} className="user-info-card" style={{ marginBottom: '30px' }}>
+            <form
+                onSubmit={handleCreate}
+                className="user-info-card"
+                style={{ marginBottom: '30px' }}
+            >
                 <h3 style={{ marginTop: 0 }}>Create New Course</h3>
-                <input placeholder="Course Title" value={newCourse.title} onChange={e => setNewCourse({ ...newCourse, title: e.target.value })} required className="form-input" />
-                <input placeholder="Course Code" value={newCourse.code} onChange={e => setNewCourse({ ...newCourse, code: e.target.value })} required className="form-input" />
 
-                <select value={newCourse.targetDeptId} onChange={e => setNewCourse({ ...newCourse, targetDeptId: e.target.value })} required className="form-input">
+                <input
+                    placeholder="Course Title"
+                    value={newCourse.title}
+                    onChange={e =>
+                        setNewCourse({ ...newCourse, title: e.target.value })
+                    }
+                    required
+                    className="form-input"
+                />
+
+                <input
+                    placeholder="Course Code"
+                    value={newCourse.code}
+                    onChange={e =>
+                        setNewCourse({ ...newCourse, code: e.target.value })
+                    }
+                    required
+                    className="form-input"
+                />
+
+                <select
+                    value={newCourse.targetDeptId}
+                    onChange={e =>
+                        setNewCourse({
+                            ...newCourse,
+                            targetDeptId: e.target.value
+                        })
+                    }
+                    required
+                    className="form-input"
+                >
                     <option value="">Select Target Department</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    {departments.map(d => (
+                        <option key={d.id} value={d.id}>
+                            {d.name}
+                        </option>
+                    ))}
                 </select>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <input type="number" placeholder="Year" value={newCourse.year} onChange={e => setNewCourse({ ...newCourse, year: e.target.value })} required className="form-input" />
-                    <input type="number" placeholder="Semester" value={newCourse.semester} onChange={e => setNewCourse({ ...newCourse, semester: e.target.value })} required className="form-input" />
+                    <input
+                        type="number"
+                        placeholder="Year"
+                        value={newCourse.year}
+                        onChange={e =>
+                            setNewCourse({ ...newCourse, year: e.target.value })
+                        }
+                        required
+                        className="form-input"
+                    />
+                    <input
+                        type="number"
+                        placeholder="Semester"
+                        value={newCourse.semester}
+                        onChange={e =>
+                            setNewCourse({
+                                ...newCourse,
+                                semester: e.target.value
+                            })
+                        }
+                        required
+                        className="form-input"
+                    />
                 </div>
-                <button type="submit" className="btn-approve">Create Course</button>
+
+                <button type="submit" className="btn-approve">
+                    Create Course
+                </button>
             </form>
 
             <div className="admin-section">
@@ -85,10 +173,18 @@ const TeacherCourses = () => {
                             <tr key={c.id}>
                                 <td>{c.code}</td>
                                 <td>{c.title}</td>
-                                <td>{c.deptName} (Y{c.year} S{c.semester})</td>
                                 <td>
-                                    <button onClick={() => handleSync(c.id)} className="btn-approve">
+                                    {c.deptName} (Y{c.year} S{c.semester})
+                                </td>
+                                <td>
+                                    <button
+                                        onClick={() => handleSync(c.id)}
+                                        className="btn-approve"
+                                    >
                                         Sync Batch
+                                    </button>
+                                    <button onClick={() => navigate(`/course-details/${c.id}`)} className="btn-action" style={{ padding: '5px 10px', marginLeft: '5px' }}>
+                                        View Students
                                     </button>
                                 </td>
                             </tr>
