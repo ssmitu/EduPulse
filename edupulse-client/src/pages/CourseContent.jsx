@@ -14,19 +14,16 @@ const CourseContent = () => {
 
     const navigate = useNavigate();
 
-    // ✅ Async logic inside useEffect
     useEffect(() => {
         const fetchMaterials = async () => {
             const res = await API.get(`/Courses/${id}/materials`);
             setMaterials(res.data);
         };
-
         fetchMaterials();
     }, [id]);
 
     const handleUpload = async (e) => {
         e.preventDefault();
-
         const formData = new FormData();
         formData.append('title', title);
         formData.append('description', description);
@@ -42,7 +39,6 @@ const CourseContent = () => {
             setDescription('');
             setFile(null);
 
-            // refresh materials
             const res = await API.get(`/Courses/${id}/materials`);
             setMaterials(res.data);
         } catch {
@@ -50,40 +46,24 @@ const CourseContent = () => {
         }
     };
 
-    // ✅ Helper function for file previews
     const renderPreview = (material) => {
         if (!material.fileUrl) return null;
-
         const url = `https://localhost:7096${material.fileUrl}`;
         const extension = material.fileName.split('.').pop().toLowerCase();
 
-        // Image preview
         if (['jpg', 'jpeg', 'png', 'gif'].includes(extension)) {
             return (
-                <div style={{ marginTop: '10px' }}>
-                    <img
-                        src={url}
-                        alt="preview"
-                        style={{
-                            maxWidth: '100%',
-                            borderRadius: '5px',
-                            border: '1px solid #ccc'
-                        }}
-                    />
+                <div className="file-preview file-preview-image">
+                    <img src={url} alt="preview" />
                 </div>
             );
         }
 
-        // PDF preview
         if (extension === 'pdf') {
             return (
-                <div style={{ marginTop: '10px' }}>
-                    <iframe
-                        src={url}
-                        title="pdf-preview"
-                        style={{ width: '100%', height: '400px', border: 'none', borderRadius: '5px' }}
-                    />
-                    <p style={{ fontSize: '0.8em' }}>
+                <div className="file-preview file-preview-pdf">
+                    <iframe src={url} title="pdf-preview" />
+                    <p className="file-preview-note">
                         <a href={url} target="_blank" rel="noreferrer">
                             Open PDF in full screen ↗
                         </a>
@@ -92,42 +72,29 @@ const CourseContent = () => {
             );
         }
 
-        // Other file types (PPTX, DOCX, etc.) as download
         return (
-            <div style={{ marginTop: '10px', background: '#eee', padding: '10px', borderRadius: '5px' }}>
-                📎{' '}
-                <a href={url} target="_blank" rel="noreferrer" download>
+            <div className="file-preview file-preview-other">
+                📎 <a href={url} target="_blank" rel="noreferrer" download>
                     Download: {material.fileName}
                 </a>
-                <p style={{ fontSize: '0.75em', color: '#666', marginTop: '5px' }}>
-                    (Office files must be downloaded to view)
-                </p>
+                <p className="file-preview-note">(Office files must be downloaded to view)</p>
             </div>
         );
     };
 
-    if (!user) {
-        return <div className="dashboard-container">Loading...</div>;
-    }
+    if (!user) return <div className="dashboard-container">Loading...</div>;
 
     return (
         <div className="dashboard-container">
-            <div className="header-strip">
-                <button
-                    onClick={() => navigate('/dashboard')}
-                    className="btn-action"
-                >
+            <div className="header-strip course-content-header">
+                <button onClick={() => navigate('/dashboard')} className="btn-action">
                     ← Back
                 </button>
                 <h2>Course Stream</h2>
             </div>
 
             {user.role === 'Teacher' && (
-                <form
-                    onSubmit={handleUpload}
-                    className="user-info-card"
-                    style={{ marginBottom: '30px' }}
-                >
+                <form onSubmit={handleUpload} className="user-info-card course-content-form">
                     <h3>Post Announcement or Material</h3>
 
                     <input
@@ -148,7 +115,7 @@ const CourseContent = () => {
                     <input
                         type="file"
                         onChange={(e) => setFile(e.target.files[0])}
-                        style={{ marginBottom: '10px' }}
+                        className="file-input"
                     />
 
                     <button type="submit" className="btn-approve">
@@ -157,7 +124,6 @@ const CourseContent = () => {
                 </form>
             )}
 
-            {/* ================= CLASS FEED ================= */}
             <div className="admin-section">
                 <h3>Class Feed</h3>
 
@@ -165,23 +131,14 @@ const CourseContent = () => {
                     <p>Nothing posted yet.</p>
                 ) : (
                     materials.map((m) => (
-                        <div
-                            key={m.id}
-                            className="user-info-card"
-                            style={{
-                                marginBottom: '15px',
-                                borderLeft: '5px solid #007bff',
-                                color: 'black'
-                            }}
-                        >
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <h4 style={{ margin: 0 }}>{m.title}</h4>
+                        <div key={m.id} className="user-info-card course-material-card">
+                            <div className="course-material-header">
+                                <h4>{m.title}</h4>
                                 <small>{new Date(m.createdAt).toLocaleDateString()}</small>
                             </div>
 
                             <p>{m.description}</p>
 
-                            {/* ✅ Render file preview */}
                             {renderPreview(m)}
                         </div>
                     ))

@@ -19,16 +19,14 @@ const Register = () => {
         e.preventDefault();
         setError('');
 
-        // Prepare the data to send
         const payload = {
             name: formData.name,
             email: formData.email,
             password: formData.password,
             role: formData.role,
-            departmentId: parseInt(formData.departmentId) // Ensure this is a number
+            departmentId: parseInt(formData.departmentId)
         };
 
-        // ONLY add year/sem for students, and ONLY add key for teachers
         if (formData.role === 'Student') {
             payload.year = parseInt(formData.year);
             payload.semester = parseInt(formData.semester);
@@ -41,12 +39,10 @@ const Register = () => {
             alert("Registration Successful! You can now login.");
             navigate('/login');
         } catch (err) {
-            // FIX: Handle both string and object errors from Backend
             const backendError = err.response?.data;
             if (typeof backendError === 'string') {
                 setError(backendError);
             } else if (backendError?.errors) {
-                // If it's a validation object, get the first error message
                 const firstErrorKey = Object.keys(backendError.errors)[0];
                 setError(backendError.errors[firstErrorKey][0]);
             } else {
@@ -57,11 +53,10 @@ const Register = () => {
 
     return (
         <div className="auth-wrapper">
-            <div className="auth-card" style={{ width: '400px' }}>
+            <div className="auth-card auth-card-register">
                 <form onSubmit={handleSubmit}>
                     <h2>EduPulse Sign Up</h2>
 
-                    {/* Error display fix */}
                     {error && <div className="error-msg">{error}</div>}
 
                     <div className="form-group">
@@ -96,7 +91,7 @@ const Register = () => {
                     </div>
 
                     {formData.role === 'Student' && (
-                        <div style={{ display: 'flex', gap: '10px' }}>
+                        <div className="student-fields">
                             <div className="form-group">
                                 <label>Year</label>
                                 <input type="number" className="form-input" min="1" max="4" onChange={e => setFormData({ ...formData, year: e.target.value })} required />
@@ -115,10 +110,10 @@ const Register = () => {
                         </div>
                     )}
 
-                    <button type="submit" className="btn-primary" style={{ backgroundColor: '#28a745' }}>Sign Up</button>
+                    <button type="submit" className="btn-primary btn-signup">Sign Up</button>
 
-                    <p style={{ textAlign: 'center', marginTop: '15px', fontSize: '0.85em' }}>
-                        Already have an account? <span onClick={() => navigate('/login')} style={{ color: '#007bff', cursor: 'pointer' }}>Login</span>
+                    <p className="auth-footer-text">
+                        Already have an account? <span className="auth-footer-link" onClick={() => navigate('/login')}>Login</span>
                     </p>
                 </form>
             </div>
