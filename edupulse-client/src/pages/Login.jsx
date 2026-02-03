@@ -58,8 +58,8 @@ const Login = () => {
                         Login
                     </button>
 
-                    <p style={{ textAlign: 'center', marginTop: '15px', fontSize: '0.85em' }}>
-                        Don't have an account? <span onClick={() => navigate('/register')} style={{ color: '#007bff', cursor: 'pointer' }}>Sign Up</span>
+                    <p className="auth-footer-text">
+                        Don't have an account? <span className="auth-footer-link" onClick={() => navigate('/register')}>Sign Up</span>
                     </p>
                 </form>
             </div>

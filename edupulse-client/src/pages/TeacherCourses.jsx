@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const TeacherCourses = () => {
-    useContext(AuthContext); // Keep context call without using 'user' to avoid ESLint error
+    useContext(AuthContext); // keep context call for ESLint
     const [courses, setCourses] = useState([]);
     const [newCourse, setNewCourse] = useState({
         title: '',
@@ -70,7 +70,8 @@ const TeacherCourses = () => {
 
     return (
         <div className="dashboard-container">
-            <div className="header-strip">
+            {/* Header */}
+            <div className="header-strip teacher-courses-header">
                 <button
                     onClick={() => navigate('/dashboard')}
                     className="btn-action"
@@ -80,12 +81,12 @@ const TeacherCourses = () => {
                 <h2>Manage Your Courses</h2>
             </div>
 
+            {/* Create Course Form */}
             <form
                 onSubmit={handleCreate}
-                className="user-info-card"
-                style={{ marginBottom: '30px' }}
+                className="user-info-card teacher-course-form"
             >
-                <h3 style={{ marginTop: 0 }}>Create New Course</h3>
+                <h3>Create New Course</h3>
 
                 <input
                     placeholder="Course Title"
@@ -126,7 +127,7 @@ const TeacherCourses = () => {
                     ))}
                 </select>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div className="teacher-course-year-sem">
                     <input
                         type="number"
                         placeholder="Year"
@@ -157,6 +158,7 @@ const TeacherCourses = () => {
                 </button>
             </form>
 
+            {/* Active Courses Table */}
             <div className="admin-section">
                 <h3>Your Active Courses</h3>
                 <table className="admin-table">
@@ -183,7 +185,10 @@ const TeacherCourses = () => {
                                     >
                                         Sync Batch
                                     </button>
-                                    <button onClick={() => navigate(`/course-details/${c.id}`)} className="btn-action" style={{ padding: '5px 10px', marginLeft: '5px' }}>
+                                    <button
+                                        onClick={() => navigate(`/course-details/${c.id}`)}
+                                        className="btn-action btn-view-students"
+                                    >
                                         View Students
                                     </button>
                                 </td>

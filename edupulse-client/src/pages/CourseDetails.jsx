@@ -42,17 +42,18 @@ const CourseDetails = () => {
 
     return (
         <div className="dashboard-container">
-            <div className="header-strip">
+            {/* Header */}
+            <div className="header-strip course-details-header">
                 <button onClick={() => navigate('/teacher-courses')} className="btn-action">
                     ← Back to Courses
                 </button>
                 <h2>Course Enrollment List</h2>
             </div>
 
+            {/* Manual Enrollment Form */}
             <form
                 onSubmit={handleManualEnroll}
-                className="user-info-card"
-                style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}
+                className="user-info-card manual-enroll-form"
             >
                 <input
                     placeholder="Student Email (@aust.edu)"
@@ -61,11 +62,12 @@ const CourseDetails = () => {
                     onChange={e => setManualEmail(e.target.value)}
                     required
                 />
-                <button type="submit" className="btn-approve" style={{ width: '200px' }}>
+                <button type="submit" className="btn-approve btn-manual-enroll">
                     Add Irregular Student
                 </button>
             </form>
 
+            {/* Students Table */}
             <div className="admin-section">
                 <table className="admin-table">
                     <thead>
@@ -80,7 +82,7 @@ const CourseDetails = () => {
                             <tr key={s.studentId}>
                                 <td>{s.name}</td>
                                 <td>{s.email}</td>
-                                <td style={{ color: s.status === 'Regular' ? '#28a745' : '#ffc107' }}>
+                                <td className={s.status === 'Regular' ? 'status-regular' : 'status-irregular'}>
                                     {s.status}
                                 </td>
                             </tr>
