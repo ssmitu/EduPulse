@@ -16,6 +16,7 @@ namespace EduPulse.API.Data
         public DbSet<Enrollment> Enrollments { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Department> Departments { get; set; }
+        public DbSet<CourseMaterial> CourseMaterials { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

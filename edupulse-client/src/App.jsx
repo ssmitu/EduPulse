@@ -4,7 +4,8 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import TeacherCourses from './pages/TeacherCourses';
 import ProtectedRoute from './components/ProtectedRoute';
-import CourseDetails from './pages/CourseDetails'; 
+import CourseDetails from './pages/CourseDetails';
+import CourseContent from './pages/CourseContent';
 
 function App() {
     return (
@@ -42,6 +43,16 @@ function App() {
                     element={
                         <ProtectedRoute requiredRole="Teacher">
                             <CourseDetails />
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* ✅ Accessible by BOTH Teacher & Student */}
+                <Route
+                    path="/course-content/:id"
+                    element={
+                        <ProtectedRoute>
+                            <CourseContent />
                         </ProtectedRoute>
                     }
                 />

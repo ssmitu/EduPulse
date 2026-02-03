@@ -5,12 +5,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace EduPulse.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize] // Only logged-in users can touch these endpoints
+    [Authorize] // Only logged-in users can access these endpoints
     public class CoursesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
@@ -20,38 +21,90 @@ namespace EduPulse.API.Controllers
             _context = context;
         }
 
-        // 1. GET: Fetch all courses (for the list)
+        // 1. GET: Fetch courses based on role (Teacher / Student / Admin)
         [HttpGet]
-        public async Task<IActionResult> GetAllCourses()
+        public async Task<IActionResult> GetMyCourses()
         {
-            var courses = await _context.Courses
+            // 1. Get current User ID and Role from Token
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var roleClaim = User.FindFirst(ClaimTypes.Role);
+
+            if (userIdClaim == null || roleClaim == null) return Unauthorized();
+
+            int userId = int.Parse(userIdClaim.Value);
+            string userRole = roleClaim.Value;
+
+            // 2. Logic for TEACHERS: Show only courses they created
+            if (userRole == "Teacher")
+            {
+                var teacherCourses = await _context.Courses
+                    .Where(c => c.TeacherId == userId)
+                    .Include(c => c.TargetDept)
+                    .Select(c => new
+                    {
+                        c.Id,
+                        c.Title,
+                        c.Code,
+                        DeptName = c.TargetDept != null ? c.TargetDept.Name : "N/A",
+                        Year = (c.TargetSemester + 1) / 2,
+                        Semester = c.TargetSemester % 2 == 0 ? 2 : 1
+                    })
+                    .ToListAsync();
+
+                return Ok(teacherCourses);
+            }
+
+            // 3. Logic for STUDENTS: Show only courses they are ENROLLED in
+            if (userRole == "Student")
+            {
+                var studentCourses = await _context.Enrollments
+                    .Where(e => e.StudentId == userId)
+                    .Include(e => e.Course)
+                        .ThenInclude(c => c!.TargetDept)
+                    .Include(e => e.Course!.Teacher) // Ensures TeacherName is not null
+                    .Select(e => new
+                    {
+                        e.Course!.Id,
+                        e.Course.Title,
+                        e.Course.Code,
+                        DeptName = e.Course.TargetDept != null ? e.Course.TargetDept.Name : "N/A",
+                        TeacherName = e.Course.Teacher != null ? e.Course.Teacher.Name : "Unknown",
+                        Year = (e.Course.TargetSemester + 1) / 2,
+                        Semester = e.Course.TargetSemester % 2 == 0 ? 2 : 1,
+                        e.Status // "Regular" or "Retake"
+                    })
+                    .ToListAsync();
+
+                return Ok(studentCourses);
+            }
+
+            // 4. Logic for ADMIN: Show all courses
+            var allCourses = await _context.Courses
                 .Include(c => c.TargetDept)
+                .Include(c => c.Teacher)
                 .Select(c => new
                 {
                     c.Id,
                     c.Title,
                     c.Code,
-                    c.TargetDeptId,
                     DeptName = c.TargetDept != null ? c.TargetDept.Name : "N/A",
-                    c.TargetSemester,
+                    TeacherName = c.Teacher != null ? c.Teacher.Name : "Unknown",
                     Year = (c.TargetSemester + 1) / 2,
                     Semester = c.TargetSemester % 2 == 0 ? 2 : 1
                 })
                 .ToListAsync();
 
-            return Ok(courses);
+            return Ok(allCourses);
         }
 
         // 2. POST: Create a Course
         [HttpPost]
         public async Task<IActionResult> CreateCourse(CourseCreateDto dto)
         {
-            // Extract Teacher ID from the JWT Token
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null) return Unauthorized();
 
             int teacherId = int.Parse(userIdClaim.Value);
-
             int flatSemester = ((dto.Year - 1) * 2) + dto.Semester;
 
             var course = new Course
@@ -65,6 +118,7 @@ namespace EduPulse.API.Controllers
 
             _context.Courses.Add(course);
             await _context.SaveChangesAsync();
+
             return Ok(course);
         }
 
@@ -101,6 +155,7 @@ namespace EduPulse.API.Controllers
             }
 
             await _context.SaveChangesAsync();
+
             return Ok(new { message = $"Successfully synced! {enrolledCount} students enrolled." });
         }
 
@@ -116,7 +171,7 @@ namespace EduPulse.API.Controllers
                     e.StudentId,
                     e.Student!.Name,
                     e.Student.Email,
-                    e.Status // Regular or Retake
+                    e.Status
                 })
                 .ToListAsync();
 
@@ -155,6 +210,101 @@ namespace EduPulse.API.Controllers
             {
                 message = $"{student.Name} enrolled as Irregular/Retake student."
             });
+        }
+
+        // 6. GET: Logged-in student's enrolled courses
+        [HttpGet("my-courses")]
+        public async Task<IActionResult> GetStudentCourses()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null) return Unauthorized();
+
+            int studentId = int.Parse(userIdClaim.Value);
+
+            var courses = await _context.Enrollments
+                .Where(e => e.StudentId == studentId)
+                .Include(e => e.Course)
+                    .ThenInclude(c => c!.Teacher)
+                .Select(e => new
+                {
+                    e.Course!.Id,
+                    e.Course.Title,
+                    e.Course.Code,
+                    TeacherName = e.Course.Teacher != null
+                        ? e.Course.Teacher.Name
+                        : "Unknown",
+                    e.Status
+                })
+                .ToListAsync();
+
+            return Ok(courses);
+        }
+
+        // 7. GET: Course materials / announcements with enrollment check for students
+        [HttpGet("{courseId}/materials")]
+        public async Task<IActionResult> GetMaterials(int courseId)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            var role = User.FindFirst(ClaimTypes.Role)!.Value;
+
+            // If it's a student, check if they are actually enrolled in THIS course
+            if (role == "Student")
+            {
+                bool isEnrolled = await _context.Enrollments
+                    .AnyAsync(e => e.CourseId == courseId && e.StudentId == userId);
+
+                if (!isEnrolled)
+                    return Forbid("You are not enrolled in this course.");
+            }
+
+            var materials = await _context.CourseMaterials
+                .Where(m => m.CourseId == courseId)
+                .OrderByDescending(m => m.CreatedAt)
+                .ToListAsync();
+
+            return Ok(materials);
+        }
+
+
+        // 8. POST: Upload material or announcement
+        [HttpPost("{courseId}/upload")]
+        public async Task<IActionResult> UploadMaterial(
+            int courseId,
+            [FromForm] string title,
+            [FromForm] string? description,
+            IFormFile? file
+        )
+        {
+            var material = new CourseMaterial
+            {
+                CourseId = courseId,
+                Title = title,
+                Description = description,
+                MaterialType = file != null ? "File" : "Announcement"
+            };
+
+            if (file != null)
+            {
+                var fileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
+                var filePath = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "Uploads",
+                    fileName
+                );
+
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                material.FileName = file.FileName;
+                material.FileUrl = "/Uploads/" + fileName;
+            }
+
+            _context.CourseMaterials.Add(material);
+            await _context.SaveChangesAsync();
+
+            return Ok(material);
         }
     }
 }
