@@ -4,6 +4,7 @@ using EduPulse.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EduPulse.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260204063600_AddGradebookTables")]
+    partial class AddGradebookTables
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -65,20 +68,13 @@ namespace EduPulse.API.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("GradingPolicy")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsPublished")
-                        .HasColumnType("bit");
-
                     b.Property<int>("TargetDeptId")
                         .HasColumnType("int");
 
                     b.Property<int>("TargetSemester")
                         .HasColumnType("int");
 
-                    b.Property<int?>("TeacherId")
+                    b.Property<int>("TeacherId")
                         .HasColumnType("int");
 
                     b.Property<string>("Title")
@@ -254,7 +250,7 @@ namespace EduPulse.API.Migrations
             modelBuilder.Entity("EduPulse.API.Models.Assessment", b =>
                 {
                     b.HasOne("EduPulse.API.Models.Course", "Course")
-                        .WithMany("Assessments")
+                        .WithMany()
                         .HasForeignKey("CourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -272,7 +268,9 @@ namespace EduPulse.API.Migrations
 
                     b.HasOne("EduPulse.API.Models.User", "Teacher")
                         .WithMany()
-                        .HasForeignKey("TeacherId");
+                        .HasForeignKey("TeacherId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("TargetDept");
 
@@ -346,8 +344,6 @@ namespace EduPulse.API.Migrations
 
             modelBuilder.Entity("EduPulse.API.Models.Course", b =>
                 {
-                    b.Navigation("Assessments");
-
                     b.Navigation("Enrollments");
                 });
 

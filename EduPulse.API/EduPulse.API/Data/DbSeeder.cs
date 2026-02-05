@@ -36,6 +36,7 @@ namespace EduPulse.API.Data
 
                 var admin = new User
                 {
+                 
                     Name = adminName ?? "Admin",
                     Email = adminEmail ?? "admin@edupulse.com",
                     PasswordHash = BCrypt.Net.BCrypt.HashPassword(
