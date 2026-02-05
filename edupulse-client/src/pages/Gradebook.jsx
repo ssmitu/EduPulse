@@ -1,0 +1,279 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
+import { useParams, useNavigate } from 'react-router-dom';
+
+const Gradebook = () => {
+    const { courseId } = useParams();
+    const navigate = useNavigate();
+
+    const [data, setData] = useState({
+        assessments: [],
+        enrollments: [],
+        grades: [],
+        policy: 'Best 2 of 3 Quizzes'
+    });
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newCol, setNewCol] = useState({ title: '', type: 1, maxMarks: 20 });
+
+    const API_BASE = "https://localhost:7096/api";
+    const token = localStorage.getItem('token');
+
+    // 1. DATA FETCHING FUNCTION
+    // We fetch the token inside here to keep the dependency array stable
+    const refreshData = useCallback(async () => {
+        const localToken = localStorage.getItem('token');
+        if (!localToken) return;
+
+        const config = { headers: { Authorization: `Bearer ${localToken}` } };
+        try {
+            const res = await axios.get(`${API_BASE}/Assessments/gradebook/${courseId}`, config);
+            setData(res.data);
+        } catch (error) {
+            console.error("Fetch error:", error);
+        }
+    }, [courseId, API_BASE]);
+
+    // 2. INITIAL LOAD
+    useEffect(() => {
+        // Use a timeout to move the state update outside the render cycle
+        // to satisfy strict ESLint cascading render rules
+        const timer = setTimeout(() => {
+            refreshData();
+        }, 0);
+
+        return () => clearTimeout(timer);
+    }, [refreshData]);
+
+    // 3. CHANGE GRADING POLICY
+    const handlePolicyChange = async (newPolicy) => {
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        try {
+            await axios.post(`${API_BASE}/Assessments/course/${courseId}/policy`, { policy: newPolicy }, config);
+            setData(prev => ({ ...prev, policy: newPolicy }));
+        } catch { // ✅ FIX: Removed unused 'err'
+            alert("Failed to update policy");
+        }
+    };
+
+    // 4. DELETE COLUMN
+    const handleDeleteColumn = async (id) => {
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        if (!window.confirm("Delete this column and all its marks?")) return;
+        try {
+            await axios.delete(`${API_BASE}/Assessments/${id}`, config);
+            setData(prev => ({
+                ...prev,
+                assessments: (prev.assessments || []).filter(a => a.id !== id),
+                grades: (prev.grades || []).filter(g => g.assessmentId !== id)
+            }));
+        } catch { // ✅ FIX: Removed unused 'err'
+            alert("Delete failed.");
+        }
+    };
+
+    // 5. ADD NEW ASSESSMENT
+    const handleAddColumn = async () => {
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        try {
+            await axios.post(`${API_BASE}/Assessments`,
+                { ...newCol, weightage: 0, courseId: parseInt(courseId) },
+                config
+            );
+            setShowAddModal(false);
+            refreshData();
+        } catch { // ✅ FIX: Removed unused 'err'
+            alert("Error adding column");
+        }
+    };
+
+    // 6. UPDATE MARK
+    const updateMark = async (studentId, assessmentId, mark) => {
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        const numericMark = parseFloat(mark) || 0;
+
+        setData(prev => {
+            const gradesList = prev.grades || [];
+            const exists = gradesList.some(g => g.studentId === studentId && g.assessmentId === assessmentId);
+            let newGrades;
+            if (exists) {
+                newGrades = gradesList.map(g =>
+                    (g.studentId === studentId && g.assessmentId === assessmentId)
+                        ? { ...g, marksObtained: numericMark }
+                        : g
+                );
+            } else {
+                newGrades = [...gradesList, { studentId, assessmentId, marksObtained: numericMark, id: 0 }];
+            }
+            return { ...prev, grades: newGrades };
+        });
+
+        try {
+            await axios.post(`${API_BASE}/Grades/bulk-update`,
+                [{ studentId, assessmentId, marksObtained: numericMark }],
+                config
+            );
+        } catch (error) {
+            console.error("Mark update failed", error);
+        }
+    };
+
+    const calculateStats = (studentId) => {
+        const studentGrades = (data.grades || []).filter(g => g.studentId === studentId);
+        const quizAssessments = (data.assessments || []).filter(a => a.type === 1);
+
+        let quizScore = 0;
+        if (quizAssessments.length > 0) {
+            const scores = quizAssessments.map(a => {
+                const g = studentGrades.find(gr => gr.assessmentId === a.id);
+                return g ? (parseFloat(g.marksObtained) || 0) : 0;
+            });
+            scores.sort((a, b) => b - a);
+            const pickCount = data.policy?.includes('Best 3') ? 3 : 2;
+            const sum = scores.slice(0, pickCount).reduce((acc, val) => acc + val, 0);
+            quizScore = sum / pickCount;
+        }
+
+        let attdScore = 0;
+        const attd = (data.assessments || []).find(a => a.type === 0);
+        if (attd) {
+            const g = studentGrades.find(gr => gr.assessmentId === attd.id);
+            attdScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
+        }
+
+        let finalScore = 0;
+        const final = (data.assessments || []).find(a => a.type === 3);
+        if (final) {
+            const g = studentGrades.find(gr => gr.assessmentId === final.id);
+            finalScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
+        }
+
+        const total = quizScore + attdScore + finalScore;
+        return {
+            attendance: attdScore.toFixed(2),
+            quizzes: quizScore.toFixed(2),
+            final: finalScore.toFixed(2),
+            total: Math.min(total, 100).toFixed(2)
+        };
+    };
+
+    return (
+        <div className="dashboard-container">
+            <div className="header-strip">
+                <button onClick={() => navigate(-1)} className="btn-action">← Back</button>
+                <h2>Course Gradebook: {courseId}</h2>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <select
+                        className="form-input"
+                        value={data.policy}
+                        onChange={e => handlePolicyChange(e.target.value)}
+                    >
+                        <option>Best 2 of 3 Quizzes</option>
+                        <option>Best 3 of 4 Quizzes</option>
+                    </select>
+                    <button onClick={() => setShowAddModal(true)} className="btn-approve">+ Add Column</button>
+                </div>
+            </div>
+
+            <div className="user-info-card" style={{ marginTop: 20 }}>
+                <h3>Step 1: Mark Entry Spreadsheet</h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table className="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Student Name</th>
+                                {(data.assessments || []).map(a => (
+                                    <th key={a.id}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            {a.title}
+                                            <button onClick={() => handleDeleteColumn(a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 5 }}>🗑️</button>
+                                        </div>
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(data.enrollments || []).map(e => (
+                                <tr key={e.id}>
+                                    <td>{e.student?.name}</td>
+                                    {(data.assessments || []).map(a => {
+                                        const g = (data.grades || []).find(gr => gr.assessmentId === a.id && gr.studentId === e.studentId);
+                                        return (
+                                            <td key={a.id}>
+                                                <input
+                                                    type="number"
+                                                    className="form-input"
+                                                    style={{ width: '60px', textAlign: 'center' }}
+                                                    defaultValue={g?.marksObtained ?? ''}
+                                                    onBlur={ev => updateMark(e.studentId, a.id, ev.target.value)}
+                                                />
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div className="admin-section" style={{ marginTop: 30 }}>
+                <h3>Step 2: Promotion Engine</h3>
+                <table className="admin-table">
+                    <thead>
+                        <tr>
+                            <th style={{ textAlign: 'left' }}>Student</th>
+                            <th>Attendance (10)</th>
+                            <th>Quizzes (20)</th>
+                            <th>Final (70)</th>
+                            <th>Total Weighted Score</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {(data.enrollments || []).map(e => {
+                            const stats = calculateStats(e.studentId);
+                            return (
+                                <tr key={e.id}>
+                                    <td style={{ textAlign: 'left', fontWeight: '500' }}>{e.student?.name}</td>
+                                    <td style={{ color: '#555' }}>{stats.attendance}</td>
+                                    <td style={{ color: '#555' }}>{stats.quizzes}</td>
+                                    <td style={{ color: '#555' }}>{stats.final}</td>
+                                    <td style={{ fontWeight: 'bold', fontSize: '1.1rem', color: '#2c3e50' }}>{stats.total}%</td>
+                                    <td>
+                                        <span className={parseFloat(stats.total) >= 40 ? 'status-regular' : 'status-irregular'}>
+                                            {parseFloat(stats.total) >= 40 ? 'PASS' : 'FAIL'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            )
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            {showAddModal && (
+                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+                    <div className="user-info-card" style={{ width: '400px' }}>
+                        <h3>Define Assessment</h3>
+                        <label>Title</label>
+                        <input className="form-input" style={{ width: '100%', marginBottom: 15 }} placeholder="e.g. Quiz 1" onChange={e => setNewCol({ ...newCol, title: e.target.value })} />
+                        <label>Category</label>
+                        <select className="form-input" style={{ width: '100%', marginBottom: 15 }} onChange={e => setNewCol({ ...newCol, type: parseInt(e.target.value) })}>
+                            <option value={1}>Quiz / Assignment (Part of 20%)</option>
+                            <option value={0}>Attendance (Part of 10%)</option>
+                            <option value={3}>Final Exam (Part of 70%)</option>
+                        </select>
+                        <label>Max Marks</label>
+                        <input type="number" className="form-input" style={{ width: '100%', marginBottom: 15 }} placeholder="e.g. 20" onChange={e => setNewCol({ ...newCol, maxMarks: parseFloat(e.target.value) })} />
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button onClick={handleAddColumn} className="btn-approve" style={{ flex: 1 }}>Create Column</button>
+                            <button onClick={() => setShowAddModal(false)} className="btn-action" style={{ flex: 1 }}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default Gradebook;

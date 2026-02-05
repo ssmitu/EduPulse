@@ -6,7 +6,8 @@ import TeacherCourses from './pages/TeacherCourses';
 import ProtectedRoute from './components/ProtectedRoute';
 import CourseDetails from './pages/CourseDetails';
 import CourseContent from './pages/CourseContent';
-
+import Gradebook from './pages/Gradebook';
+import StudentGradeView from './pages/StudentGradeView';
 function App() {
     return (
         <Router>
@@ -56,10 +57,12 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
+                <Route path="/course/:courseId/gradebook" element={<Gradebook />} />
 
                 {/* Catch-all */}
                 <Route path="*" element={<Navigate to="/login" replace />} />
 
+                    <Route path="/student/result/:courseId" element={<StudentGradeView />} />
             </Routes>
         </Router>
     );

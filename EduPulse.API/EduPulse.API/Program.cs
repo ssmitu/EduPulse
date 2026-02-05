@@ -1,31 +1,44 @@
-using EduPulse.API.Data;
-using Microsoft.EntityFrameworkCore;
+﻿using EduPulse.API.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Add services to the container.
-builder.Services.AddControllers();
-
-// CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowReactApp",
-        policy => policy.WithOrigins("http://localhost:5173")
-                        .AllowAnyMethod()
-                        .AllowAnyHeader());
-});
-
-// Database
+// -------------------- DATABASE --------------------
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
+{
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")
-    )
-);
+    );
 
-// JWT Authentication
+    options.ConfigureWarnings(w =>
+        w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)
+    );
+});
+
+// -------------------- CONTROLLERS --------------------
+// ✅ FIX: Added JsonOptions to force camelCase naming (fixes empty tables in React)
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
+
+// -------------------- CORS --------------------
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+    );
+});
+
+// -------------------- AUTHENTICATION (JWT) --------------------
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -43,23 +56,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// Swagger
+builder.Services.AddAuthorization();
+
+// -------------------- SWAGGER --------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 2. Automatically Seed Database
+// -------------------- DATABASE SEEDING --------------------
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<ApplicationDbContext>();
     var configuration = services.GetRequiredService<IConfiguration>();
-
     DbSeeder.Seed(context, configuration);
 }
 
-// 3. Configure the HTTP request pipeline.
+// -------------------- MIDDLEWARE PIPELINE --------------------
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -67,7 +81,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowReactApp");
-
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
@@ -75,13 +88,17 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Enable serving files from the 'Uploads' folder
+// -------------------- STATIC FILES (Uploads) --------------------
 var uploadsPath = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
-if (!Directory.Exists(uploadsPath)) Directory.CreateDirectory(uploadsPath);
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+}
 
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
     RequestPath = "/Uploads"
 });
+
 app.Run();

@@ -146,6 +146,46 @@ const Dashboard = () => {
                                     <span className="course-year-sem">
                                         Year {course.year} Sem {course.semester}
                                     </span>
+
+                                    {/* TEACHER ACTIONS: Manage Students & Gradebook */}
+                                    {user.role === 'Teacher' && (
+                                        <div className="course-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                                            <button
+                                                onClick={() => navigate(`/course/${course.id}/gradebook`)}
+                                                className="btn-approve"
+                                                style={{
+                                                    fontSize: '0.85rem',
+                                                    padding: '5px 10px',
+                                                    backgroundColor: '#6b46c1',
+                                                    flex: 1
+                                                }}
+                                            >
+                                                📊 Gradebook
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* ✅ STUDENT ACTIONS: View Result (THIS WAS MISSING) */}
+                                    {user.role === 'Student' && (
+                                        <div className="course-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: '15px' }}>
+                                            <button
+                                                onClick={() => navigate(`/student/result/${course.id}`)}
+                                                className="btn-approve"
+                                                style={{
+                                                    fontSize: '0.85rem',
+                                                    padding: '5px 10px',
+                                                    width: '100%',
+                                                    backgroundColor: '#2ecc71', // Green color
+                                                    border: 'none',
+                                                    color: 'white',
+                                                    cursor: 'pointer',
+                                                    borderRadius: '4px'
+                                                }}
+                                            >
+                                                📊 View Result
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}

@@ -7,12 +7,11 @@
         public int CourseId { get; set; }
         public Course? Course { get; set; }
 
+        // ✅ MUST match User.Id (int)
         public int StudentId { get; set; }
         public User? Student { get; set; }
 
-        // Useful for your "Irregular Handling" logic
-        public string Status { get; set; } = "Regular"; // "Regular", "Retake", "Carry"
-
+        public string Status { get; set; } = "Regular"; // Regular, Retake, Carry
         public DateTime EnrolledAt { get; set; } = DateTime.Now;
     }
 }

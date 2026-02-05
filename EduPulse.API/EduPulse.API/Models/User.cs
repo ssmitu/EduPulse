@@ -17,7 +17,6 @@ namespace EduPulse.API.Models
         public string Name { get; set; } = string.Empty;
 
         [Required]
-        [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
         [Required]
@@ -25,12 +24,13 @@ namespace EduPulse.API.Models
 
         public UserRole Role { get; set; }
 
-        public bool IsVerified { get; set; } = false;
+        public bool IsVerified { get; set; }
 
         public int? CurrentSemester { get; set; }
 
-        // Foreign Key for Department
         public int DepartmentId { get; set; }
         public Department? Department { get; set; }
+
+        public ICollection<Grade> Grades { get; set; } = new List<Grade>();
     }
 }
