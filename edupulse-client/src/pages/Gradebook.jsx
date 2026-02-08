@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -6,16 +6,21 @@ const Gradebook = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
 
+    // 1. Data State
     const [data, setData] = useState({
         assessments: [],
-        enrollments: [], // We will map students from the new endpoint here
+        enrollments: [],
         grades: [],
         policy: 'Best 2 of 3 Quizzes'
     });
+
+    // 2. Refresh Trigger (Fixes the ESLint Error)
+    const [refreshKey, setRefreshKey] = useState(0);
+
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCol, setNewCol] = useState({ title: '', type: 1, maxMarks: 20 });
 
-    // --- NEW STATE FOR SOFT SKILLS ---
+    // --- STATE FOR SOFT SKILLS ---
     const [selectedEnrollment, setSelectedEnrollment] = useState(null);
     const [softSkills, setSoftSkills] = useState({
         discipline: 3,
@@ -26,53 +31,66 @@ const Gradebook = () => {
     const API_BASE = "https://localhost:7096/api";
     const token = localStorage.getItem('token');
 
-    // 1. DATA FETCHING FUNCTION (Updated to call GradesController)
-    // We fetch the token inside here to keep the dependency array stable
-    // We fetch the token inside here to keep the dependency array stable
-    const refreshData = useCallback(async () => {
-        const localToken = localStorage.getItem('token');
-        if (!localToken) return;
-
-        const config = { headers: { Authorization: `Bearer ${localToken}` } };
-        try {
-            // ✅ CHANGED: Now calling the automated Grades endpoint instead of Assessments
-            const res = await axios.get(`${API_BASE}/Grades/course/${courseId}`, config);
-
-            // Map the API response to our local state structure
-            setData({
-                assessments: res.data.assessments,
-                grades: res.data.grades,
-                enrollments: res.data.students.map(s => ({ studentId: s.studentId, student: { name: s.name } })),
-                policy: res.data.policy || 'Best 2 of 3 Quizzes'
-            });
-        } catch (error) {
-            console.error("Fetch error:", error);
-        }
-    }, [courseId, API_BASE]);
-
+    // 3. MAIN DATA FETCHING EFFECT
+    // This runs whenever 'courseId' changes OR 'refreshKey' changes
     useEffect(() => {
-        const timer = setTimeout(() => {
-            refreshData();
-        }, 0);
-        return () => clearTimeout(timer);
-    // --- NEW HANDLER TO SAVE SOFT SKILLS ---
+        const fetchAllData = async () => {
+            const localToken = localStorage.getItem('token');
+            if (!localToken) return;
+
+            const config = { headers: { Authorization: `Bearer ${localToken}` } };
+            try {
+                const res = await axios.get(`${API_BASE}/Grades/course/${courseId}`, config);
+
+                // Debugging: Log the exact data coming from backend
+                console.log("Backend Response:", res.data);
+
+                // Handle Capital vs Small letter mismatch safely
+                const rawStudents = res.data.students || res.data.Students || [];
+                const rawAssessments = res.data.assessments || res.data.Assessments || [];
+                const rawGrades = res.data.grades || res.data.Grades || [];
+                const rawPolicy = res.data.policy || res.data.Policy || 'Best 2 of 3 Quizzes';
+
+                setData({
+                    assessments: rawAssessments,
+                    grades: rawGrades,
+                    // Robust mapping: Checks for both s.studentId (camel) and s.StudentId (Pascal)
+                    enrollments: rawStudents.map(s => ({
+                        studentId: s.studentId || s.StudentId,
+                        student: { name: s.name || s.Name || "Unknown" }
+                    })),
+                    policy: rawPolicy
+                });
+            } catch (error) {
+                console.error("Fetch error:", error);
+            }
+        };
+
+        fetchAllData();
+    }, [courseId, refreshKey]); // ✅ Safe dependency array
+
+    // --- HANDLER TO SAVE SOFT SKILLS ---
     const handleSaveSoftSkills = async () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
             await axios.post(`${API_BASE}/SoftSkills/upsert`, {
-                enrollmentId: selectedEnrollment.id, // Using e.id from the map
-                ...softSkills
+                studentId: selectedEnrollment.studentId,
+                courseId: parseInt(courseId),
+                discipline: softSkills.discipline,
+                participation: softSkills.participation,
+                collaboration: softSkills.collaboration
             }, config);
+
             alert(`Soft skills saved for ${selectedEnrollment.student.name}`);
             setSelectedEnrollment(null);
+            setSoftSkills({ discipline: 3, participation: 3, collaboration: 3 });
         } catch (error) {
             console.error("Save error:", error);
-            alert("Failed to save soft skills.");
+            alert("Error saving soft skills. Check console.");
         }
     };
 
-    // 3. CHANGE GRADING POLICY
-    // 3. CHANGE GRADING POLICY
+    // 4. CHANGE GRADING POLICY
     const handlePolicyChange = async (newPolicy) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
@@ -83,17 +101,21 @@ const Gradebook = () => {
         }
     };
 
+    // 5. DELETE COLUMN
     const handleDeleteColumn = async (id) => {
-        const config = { headers: { Authorization: `Bearer ${token}` } };
         if (!window.confirm("Delete this column and all its marks?")) return;
-            refreshData();
-        } catch {
-        } catch { // ✅ FIX: Removed unused 'err'
+
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        try {
+            await axios.delete(`${API_BASE}/Assessments/${id}`, config);
+            // Trigger a re-fetch
+            setRefreshKey(old => old + 1);
         } catch {
             alert("Delete failed.");
         }
     };
 
+    // 6. ADD COLUMN
     const handleAddColumn = async () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
@@ -102,24 +124,27 @@ const Gradebook = () => {
                 config
             );
             setShowAddModal(false);
-            refreshData();
+            // Trigger a re-fetch
+            setRefreshKey(old => old + 1);
         } catch {
             alert("Error adding column");
         }
     };
 
+    // 7. UPDATE MARKS
     const updateMark = async (studentId, assessmentId, mark) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         const numericMark = parseFloat(mark) || 0;
 
-        // Optimistic UI update
         setData(prev => {
             const gradesList = prev.grades || [];
-            const exists = gradesList.some(g => g.studentId === studentId && g.assessmentId === assessmentId);
+            // Check carefully for matching IDs (handling case sensitivity)
+            const exists = gradesList.some(g => (g.studentId || g.StudentId) === studentId && (g.assessmentId || g.AssessmentId) === assessmentId);
+
             let newGrades;
             if (exists) {
                 newGrades = gradesList.map(g =>
-                    (g.studentId === studentId && g.assessmentId === assessmentId)
+                    ((g.studentId || g.StudentId) === studentId && (g.assessmentId || g.AssessmentId) === assessmentId)
                         ? { ...g, marksObtained: numericMark }
                         : g
                 );
@@ -139,34 +164,40 @@ const Gradebook = () => {
         }
     };
 
+    // 8. CALCULATE STATS
     const calculateStats = (studentId) => {
-        const studentGrades = (data.grades || []).filter(g => g.studentId === studentId);
-        const quizAssessments = (data.assessments || []).filter(a => a.type === 1);
+        // Safe access to properties
+        const studentGrades = (data.grades || []).filter(g => (g.studentId || g.StudentId) === studentId);
+        const quizAssessments = (data.assessments || []).filter(a => (a.type || a.Type) === 1);
 
         let quizScore = 0;
         if (quizAssessments.length > 0) {
             const scores = quizAssessments.map(a => {
-                const g = studentGrades.find(gr => gr.assessmentId === a.id);
-                return g ? (parseFloat(g.marksObtained) || 0) : 0;
+                const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (a.id || a.Id));
+                // Handle property casing for MarksObtained
+                const marks = g ? (g.marksObtained !== undefined ? g.marksObtained : g.MarksObtained) : 0;
+                return parseFloat(marks) || 0;
             });
             scores.sort((a, b) => b - a);
             const pickCount = data.policy?.includes('Best 3') ? 3 : 2;
             const sum = scores.slice(0, pickCount).reduce((acc, val) => acc + val, 0);
-            quizScore = sum / pickCount;
+            quizScore = sum / (quizAssessments.length > 0 ? pickCount : 1);
         }
 
         let attdScore = 0;
-        const attd = (data.assessments || []).find(a => a.type === 0);
+        const attd = (data.assessments || []).find(a => (a.type || a.Type) === 0);
         if (attd) {
-            const g = studentGrades.find(gr => gr.assessmentId === attd.id);
-            attdScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
+            const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (attd.id || attd.Id));
+            const marks = g ? (g.marksObtained !== undefined ? g.marksObtained : g.MarksObtained) : 0;
+            attdScore = parseFloat(marks) || 0;
         }
 
         let finalScore = 0;
-        const final = (data.assessments || []).find(a => a.type === 3);
+        const final = (data.assessments || []).find(a => (a.type || a.Type) === 3);
         if (final) {
-            const g = studentGrades.find(gr => gr.assessmentId === final.id);
-            finalScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
+            const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (final.id || final.Id));
+            const marks = g ? (g.marksObtained !== undefined ? g.marksObtained : g.MarksObtained) : 0;
+            finalScore = parseFloat(marks) || 0;
         }
 
         const total = quizScore + attdScore + finalScore;
@@ -204,10 +235,10 @@ const Gradebook = () => {
                             <tr>
                                 <th>Student Name</th>
                                 {(data.assessments || []).map(a => (
-                                    <th key={a.id}>
+                                    <th key={a.id || a.Id}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            {a.title} {a.type === 0 && "(Auto)"}
-                                            <button onClick={() => handleDeleteColumn(a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 5 }}>🗑️</button>
+                                            {a.title || a.Title} {(a.type || a.Type) === 0 && "(Auto)"}
+                                            <button onClick={() => handleDeleteColumn(a.id || a.Id)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 5 }}>🗑️</button>
                                         </div>
                                     </th>
                                 ))}
@@ -218,10 +249,15 @@ const Gradebook = () => {
                                 <tr key={e.studentId}>
                                     <td>{e.student?.name}</td>
                                     {(data.assessments || []).map(a => {
-                                        const g = (data.grades || []).find(gr => gr.assessmentId === a.id && gr.studentId === e.studentId);
-                                        const isAttendance = a.type === 0;
+                                        const aId = a.id || a.Id;
+                                        const aType = a.type !== undefined ? a.type : a.Type;
+
+                                        const g = (data.grades || []).find(gr => (gr.assessmentId || gr.AssessmentId) === aId && (gr.studentId || gr.StudentId) === e.studentId);
+                                        const isAttendance = aType === 0;
+                                        const marks = g ? (g.marksObtained !== undefined ? g.marksObtained : g.MarksObtained) : '';
+
                                         return (
-                                            <td key={a.id}>
+                                            <td key={aId}>
                                                 <input
                                                     type="number"
                                                     className="form-input"
@@ -231,10 +267,10 @@ const Gradebook = () => {
                                                         backgroundColor: isAttendance ? '#e9ecef' : 'white',
                                                         cursor: isAttendance ? 'not-allowed' : 'text'
                                                     }}
-                                                    value={g?.marksObtained ?? ''}
-                                                    readOnly={isAttendance} // ✅ Attendance is now read-only
-                                                    onChange={ev => isAttendance ? null : updateMark(e.studentId, a.id, ev.target.value)}
-                                                    onBlur={ev => isAttendance ? null : updateMark(e.studentId, a.id, ev.target.value)}
+                                                    value={marks}
+                                                    readOnly={isAttendance}
+                                                    onChange={ev => isAttendance ? null : updateMark(e.studentId, aId, ev.target.value)}
+                                                    onBlur={ev => isAttendance ? null : updateMark(e.studentId, aId, ev.target.value)}
                                                 />
                                             </td>
                                         );
@@ -246,7 +282,7 @@ const Gradebook = () => {
                 </div>
             </div>
 
-            {/* --- NEW EVALUATION MODAL --- */}
+            {/* --- EVALUATION MODAL --- */}
             {selectedEnrollment && (
                 <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1001 }}>
                     <div className="user-info-card" style={{ width: '400px' }}>
@@ -284,7 +320,7 @@ const Gradebook = () => {
                             <th>Final (70)</th>
                             <th>Total Weighted Score</th>
                             <th>Status</th>
-                            <th>Behavior</th> {/* NEW COLUMN */}
+                            <th>Behavior</th>
                         </tr>
                     </thead>
                     <tbody>

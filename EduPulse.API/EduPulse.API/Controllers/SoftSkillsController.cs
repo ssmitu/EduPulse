@@ -1,5 +1,4 @@
 ﻿using EduPulse.API.Data;
-using EduPulse.API.DTOs;
 using EduPulse.API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,37 +18,47 @@ namespace EduPulse.API.Controllers
 
         // POST: api/SoftSkills/upsert
         [HttpPost("upsert")]
-        public async Task<IActionResult> UpsertSoftSkill(SoftSkillUpdateDto dto)
+        public async Task<IActionResult> UpsertSoftSkill([FromBody] SoftSkillRequest request)
         {
-            // 1. Find if a rating already exists for this enrollment
+            // 1. Find the Enrollment based on StudentId and CourseId
+            var enrollment = await _context.Enrollments
+                .FirstOrDefaultAsync(e => e.StudentId == request.StudentId && e.CourseId == request.CourseId);
+
+            if (enrollment == null)
+            {
+                return NotFound(new { message = "Student is not enrolled in this course." });
+            }
+
+            // 2. Find if a rating already exists for this enrollment
             var existingSkill = await _context.SoftSkills
-                .FirstOrDefaultAsync(s => s.EnrollmentId == dto.EnrollmentId);
+                .FirstOrDefaultAsync(s => s.EnrollmentId == enrollment.Id);
 
             if (existingSkill == null)
             {
-                // 2. If it doesn't exist, create a new one
+                // 3. Create new
                 var newSkill = new SoftSkill
                 {
-                    EnrollmentId = dto.EnrollmentId,
-                    Discipline = dto.Discipline,
-                    Participation = dto.Participation,
-                    Collaboration = dto.Collaboration,
+                    EnrollmentId = enrollment.Id, // Link to the correct Enrollment ID found above
+                    Discipline = request.Discipline,
+                    Participation = request.Participation,
+                    Collaboration = request.Collaboration,
                     LastUpdated = DateTime.Now
                 };
                 _context.SoftSkills.Add(newSkill);
             }
             else
             {
-                // 3. If it exists, update the values
-                existingSkill.Discipline = dto.Discipline;
-                existingSkill.Participation = dto.Participation;
-                existingSkill.Collaboration = dto.Collaboration;
+                // 4. Update existing
+                existingSkill.Discipline = request.Discipline;
+                existingSkill.Participation = request.Participation;
+                existingSkill.Collaboration = request.Collaboration;
                 existingSkill.LastUpdated = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
             return Ok(new { message = "Soft skills saved successfully!" });
         }
+
         // GET: api/SoftSkills/enrollment/{enrollmentId}
         [HttpGet("enrollment/{enrollmentId}")]
         public async Task<ActionResult<SoftSkill>> GetSoftSkillByEnrollment(int enrollmentId)
@@ -59,11 +68,20 @@ namespace EduPulse.API.Controllers
 
             if (skill == null)
             {
-                // Return a default object if no rating exists yet
                 return Ok(new { enrollmentId, discipline = 1, participation = 1, collaboration = 1 });
             }
 
             return Ok(skill);
         }
+    }
+
+    // ✅ DTO defined locally to ensure it matches the Frontend request
+    public class SoftSkillRequest
+    {
+        public int StudentId { get; set; }
+        public int CourseId { get; set; }
+        public int Discipline { get; set; }
+        public int Participation { get; set; }
+        public int Collaboration { get; set; }
     }
 }

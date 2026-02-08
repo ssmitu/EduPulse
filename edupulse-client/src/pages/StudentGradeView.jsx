@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-// ✅ Import the new component
 import AttendanceProgress from './AttendanceProgress';
 
-// Register Chart.js components
+// ✅ Added imports for Chart.js
+import {
+    Chart as ChartJS,
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend,
+} from 'chart.js';
+import { Radar } from 'react-chartjs-2';
+
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 const StudentGradeView = () => {
@@ -17,9 +27,9 @@ const StudentGradeView = () => {
         policy: '',
         assessments: [],
         grades: [],
-        enrollmentId: null // We need this to fetch soft skills
+        enrollmentId: null
     });
-    const [softSkills, setSoftSkills] = useState(null); // --- NEW STATE ---
+    const [softSkills, setSoftSkills] = useState(null);
     const [loading, setLoading] = useState(true);
 
     const API_BASE = "https://localhost:7096/api";
@@ -34,9 +44,7 @@ const StudentGradeView = () => {
                 const res = await axios.get(`${API_BASE}/Grades/student/${courseId}`, config);
                 setData(res.data);
 
-                // 2. Fetch Soft Skills using the EnrollmentId returned from the grades call
-                // Note: If your backend doesn't return enrollmentId in the grades object, 
-                // you might need to adjust the backend GradesController to include it.
+                // 2. Fetch Soft Skills using the EnrollmentId (if available)
                 if (res.data.enrollmentId) {
                     const skillRes = await axios.get(`${API_BASE}/SoftSkills/enrollment/${res.data.enrollmentId}`, config);
                     setSoftSkills(skillRes.data);
@@ -51,7 +59,7 @@ const StudentGradeView = () => {
         fetchAllData();
     }, [courseId]);
 
-    // --- RADAR CHART DATA SETUP ---
+    // Radar Chart Logic
     const radarData = {
         labels: ['Discipline', 'Participation', 'Collaboration'],
         datasets: [
@@ -82,9 +90,10 @@ const StudentGradeView = () => {
 
     const calculateStats = () => {
         const myGrades = data.grades || [];
-        const quizAssessments = (data.assessments || []).filter(a => a.type === 1);
+        const assessments = data.assessments || [];
 
         let quizScore = 0;
+        const quizAssessments = assessments.filter(a => a.type === 1);
         if (quizAssessments.length > 0) {
             const scores = quizAssessments.map(a => {
                 const g = myGrades.find(gr => gr.assessmentId === a.id);
@@ -93,22 +102,23 @@ const StudentGradeView = () => {
             scores.sort((a, b) => b - a);
             const pickCount = data.policy?.includes('Best 3') ? 3 : 2;
             const sum = scores.slice(0, pickCount).reduce((acc, val) => acc + val, 0);
-            quizScore = sum / pickCount;
+            quizScore = sum / (quizAssessments.length > 0 ? pickCount : 1);
         }
 
         let attdScore = 0;
-        const attd = (data.assessments || []).find(a => a.type === 0);
+        const attd = assessments.find(a => a.type === 0);
         if (attd) {
             const g = myGrades.find(gr => gr.assessmentId === attd.id);
             attdScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
         }
 
         let finalScore = 0;
-        const final = (data.assessments || []).find(a => a.type === 3);
+        const final = assessments.find(a => a.type === 3);
         if (final) {
             const g = myGrades.find(gr => gr.assessmentId === final.id);
             finalScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
         }
+
         const total = quizScore + attdScore + finalScore;
         return {
             attendance: attdScore.toFixed(2),
@@ -134,12 +144,13 @@ const StudentGradeView = () => {
             </div>
 
             <div className="user-info-card" style={{ marginTop: '20px' }}>
-
-                {/* ✅ NEW: Visual Attendance Progress Bar shows up first */}
                 <AttendanceProgress courseId={courseId} />
 
+                {/* Main Content Grid (3 Columns) */}
+                <div style={{ display: 'flex', gap: '20px', marginTop: '20px', flexWrap: 'wrap' }}>
+
                     {/* LEFT: Assessment Breakdown */}
-                    <div>
+                    <div style={{ flex: 1, minWidth: '300px' }}>
                         <h4>Assessment Breakdown</h4>
                         <table className="admin-table">
                             <thead>
@@ -162,8 +173,8 @@ const StudentGradeView = () => {
                         </table>
                     </div>
 
-                    {/* MIDDLE: NEW RADAR CHART */}
-                    <div style={{ textAlign: 'center', borderLeft: '1px solid #eee', borderRight: '1px solid #eee', padding: '0 10px' }}>
+                    {/* MIDDLE: RADAR CHART */}
+                    <div style={{ flex: 1, minWidth: '250px', textAlign: 'center', borderLeft: '1px solid #eee', borderRight: '1px solid #eee', padding: '0 10px' }}>
                         <h4>Behavioral Evaluation</h4>
                         <div style={{ width: '100%', maxWidth: '250px', margin: '0 auto' }}>
                             <Radar data={radarData} options={radarOptions} />
@@ -174,7 +185,7 @@ const StudentGradeView = () => {
                     </div>
 
                     {/* RIGHT: Final Calculation */}
-                    <div>
+                    <div style={{ flex: 1, minWidth: '250px' }}>
                         <h4>Final Score Calculation</h4>
                         <div className="course-card" style={{ cursor: 'default', padding: '15px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
