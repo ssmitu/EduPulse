@@ -162,10 +162,25 @@ const Dashboard = () => {
                                             >
                                                 📊 Gradebook
                                             </button>
+
+                                            {/* ✅ NEW: Attendance Button for Teachers */}
+                                            <button
+                                                onClick={() => navigate(`/attendance-sheet/${course.id}`)} // Changed from /attendance/ to /attendance-sheet/
+                                                className="btn-secondary"
+                                               
+                                                style={{
+                                                    fontSize: '0.85rem',
+                                                    padding: '5px 10px',
+                                                    backgroundColor: '#17a2b8', // Teal color for attendance
+                                                    flex: 1
+                                                }}
+                                            >
+                                                📅 Attendance
+                                            </button>
                                         </div>
                                     )}
 
-                                    {/* ✅ STUDENT ACTIONS: View Result (THIS WAS MISSING) */}
+                                    {/* ✅ STUDENT ACTIONS: View Result */}
                                     {user.role === 'Student' && (
                                         <div className="course-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: '15px' }}>
                                             <button

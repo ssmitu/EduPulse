@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+// ✅ Import the new component
+import AttendanceProgress from './AttendanceProgress';
 
 const StudentGradeView = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
 
     const [data, setData] = useState({
-        courseTitle: '', // Added field
-        courseCode: '',  // Added field
+        courseTitle: '',
+        courseCode: '',
         policy: '',
         assessments: [],
         grades: []
@@ -40,7 +42,6 @@ const StudentGradeView = () => {
         const myGrades = data.grades || [];
         const quizAssessments = (data.assessments || []).filter(a => a.type === 1);
 
-        // 1. Calculate Quiz Score
         let quizScore = 0;
         if (quizAssessments.length > 0) {
             const scores = quizAssessments.map(a => {
@@ -48,15 +49,11 @@ const StudentGradeView = () => {
                 return g ? (parseFloat(g.marksObtained) || 0) : 0;
             });
             scores.sort((a, b) => b - a);
-
             const pickCount = data.policy?.includes('Best 3') ? 3 : 2;
             const sum = scores.slice(0, pickCount).reduce((acc, val) => acc + val, 0);
-
-            // Average the best quizzes
             quizScore = sum / pickCount;
         }
 
-        // 2. Calculate Attendance
         let attdScore = 0;
         const attd = (data.assessments || []).find(a => a.type === 0);
         if (attd) {
@@ -64,7 +61,6 @@ const StudentGradeView = () => {
             attdScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
         }
 
-        // 3. Calculate Final Exam
         let finalScore = 0;
         const final = (data.assessments || []).find(a => a.type === 3);
         if (final) {
@@ -91,20 +87,16 @@ const StudentGradeView = () => {
         <div className="dashboard-container">
             <div className="header-strip">
                 <button onClick={() => navigate(-1)} className="btn-action">← Back</button>
-
-                {/* ✅ UPDATED HEADER: Shows Course No and Name separately */}
                 <div style={{ textAlign: 'right' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.5rem' }}>
-                        Course No: {data.courseCode}
-                    </h2>
-                    <span style={{ fontSize: '1.1rem', color: '#555', fontWeight: '500' }}>
-                        Course Name: {data.courseTitle}
-                    </span>
+                    <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Course No: {data.courseCode}</h2>
+                    <span style={{ fontSize: '1.1rem', color: '#555', fontWeight: '500' }}>Course Name: {data.courseTitle}</span>
                 </div>
             </div>
 
             <div className="user-info-card" style={{ marginTop: '20px' }}>
-                {/* ✅ REMOVED: The "Grading Policy" text is gone */}
+
+                {/* ✅ NEW: Visual Attendance Progress Bar shows up first */}
+                <AttendanceProgress courseId={courseId} />
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '10px' }}>
                     {/* LEFT: Detailed Breakdown */}

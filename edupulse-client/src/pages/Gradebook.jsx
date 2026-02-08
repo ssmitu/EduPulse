@@ -8,7 +8,7 @@ const Gradebook = () => {
 
     const [data, setData] = useState({
         assessments: [],
-        enrollments: [],
+        enrollments: [], // We will map students from the new endpoint here
         grades: [],
         policy: 'Best 2 of 3 Quizzes'
     });
@@ -18,60 +18,56 @@ const Gradebook = () => {
     const API_BASE = "https://localhost:7096/api";
     const token = localStorage.getItem('token');
 
-    // 1. DATA FETCHING FUNCTION
-    // We fetch the token inside here to keep the dependency array stable
+    // 1. DATA FETCHING FUNCTION (Updated to call GradesController)
     const refreshData = useCallback(async () => {
         const localToken = localStorage.getItem('token');
         if (!localToken) return;
 
         const config = { headers: { Authorization: `Bearer ${localToken}` } };
         try {
-            const res = await axios.get(`${API_BASE}/Assessments/gradebook/${courseId}`, config);
-            setData(res.data);
+            // ✅ CHANGED: Now calling the automated Grades endpoint instead of Assessments
+            const res = await axios.get(`${API_BASE}/Grades/course/${courseId}`, config);
+
+            // Map the API response to our local state structure
+            setData({
+                assessments: res.data.assessments,
+                grades: res.data.grades,
+                enrollments: res.data.students.map(s => ({ studentId: s.studentId, student: { name: s.name } })),
+                policy: res.data.policy || 'Best 2 of 3 Quizzes'
+            });
         } catch (error) {
             console.error("Fetch error:", error);
         }
     }, [courseId, API_BASE]);
 
-    // 2. INITIAL LOAD
     useEffect(() => {
-        // Use a timeout to move the state update outside the render cycle
-        // to satisfy strict ESLint cascading render rules
         const timer = setTimeout(() => {
             refreshData();
         }, 0);
-
         return () => clearTimeout(timer);
     }, [refreshData]);
 
-    // 3. CHANGE GRADING POLICY
     const handlePolicyChange = async (newPolicy) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
             await axios.post(`${API_BASE}/Assessments/course/${courseId}/policy`, { policy: newPolicy }, config);
             setData(prev => ({ ...prev, policy: newPolicy }));
-        } catch { // ✅ FIX: Removed unused 'err'
+        } catch {
             alert("Failed to update policy");
         }
     };
 
-    // 4. DELETE COLUMN
     const handleDeleteColumn = async (id) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         if (!window.confirm("Delete this column and all its marks?")) return;
         try {
             await axios.delete(`${API_BASE}/Assessments/${id}`, config);
-            setData(prev => ({
-                ...prev,
-                assessments: (prev.assessments || []).filter(a => a.id !== id),
-                grades: (prev.grades || []).filter(g => g.assessmentId !== id)
-            }));
-        } catch { // ✅ FIX: Removed unused 'err'
+            refreshData();
+        } catch {
             alert("Delete failed.");
         }
     };
 
-    // 5. ADD NEW ASSESSMENT
     const handleAddColumn = async () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
@@ -81,16 +77,16 @@ const Gradebook = () => {
             );
             setShowAddModal(false);
             refreshData();
-        } catch { // ✅ FIX: Removed unused 'err'
+        } catch {
             alert("Error adding column");
         }
     };
 
-    // 6. UPDATE MARK
     const updateMark = async (studentId, assessmentId, mark) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         const numericMark = parseFloat(mark) || 0;
 
+        // Optimistic UI update
         setData(prev => {
             const gradesList = prev.grades || [];
             const exists = gradesList.some(g => g.studentId === studentId && g.assessmentId === assessmentId);
@@ -102,7 +98,7 @@ const Gradebook = () => {
                         : g
                 );
             } else {
-                newGrades = [...gradesList, { studentId, assessmentId, marksObtained: numericMark, id: 0 }];
+                newGrades = [...gradesList, { studentId, assessmentId, marksObtained: numericMark }];
             }
             return { ...prev, grades: newGrades };
         });
@@ -184,7 +180,7 @@ const Gradebook = () => {
                                 {(data.assessments || []).map(a => (
                                     <th key={a.id}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            {a.title}
+                                            {a.title} {a.type === 0 && "(Auto)"}
                                             <button onClick={() => handleDeleteColumn(a.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', marginLeft: 5 }}>🗑️</button>
                                         </div>
                                     </th>
@@ -193,18 +189,26 @@ const Gradebook = () => {
                         </thead>
                         <tbody>
                             {(data.enrollments || []).map(e => (
-                                <tr key={e.id}>
+                                <tr key={e.studentId}>
                                     <td>{e.student?.name}</td>
                                     {(data.assessments || []).map(a => {
                                         const g = (data.grades || []).find(gr => gr.assessmentId === a.id && gr.studentId === e.studentId);
+                                        const isAttendance = a.type === 0;
                                         return (
                                             <td key={a.id}>
                                                 <input
                                                     type="number"
                                                     className="form-input"
-                                                    style={{ width: '60px', textAlign: 'center' }}
-                                                    defaultValue={g?.marksObtained ?? ''}
-                                                    onBlur={ev => updateMark(e.studentId, a.id, ev.target.value)}
+                                                    style={{
+                                                        width: '60px',
+                                                        textAlign: 'center',
+                                                        backgroundColor: isAttendance ? '#e9ecef' : 'white',
+                                                        cursor: isAttendance ? 'not-allowed' : 'text'
+                                                    }}
+                                                    value={g?.marksObtained ?? ''}
+                                                    readOnly={isAttendance} // ✅ Attendance is now read-only
+                                                    onChange={ev => isAttendance ? null : updateMark(e.studentId, a.id, ev.target.value)}
+                                                    onBlur={ev => isAttendance ? null : updateMark(e.studentId, a.id, ev.target.value)}
                                                 />
                                             </td>
                                         );
@@ -233,7 +237,7 @@ const Gradebook = () => {
                         {(data.enrollments || []).map(e => {
                             const stats = calculateStats(e.studentId);
                             return (
-                                <tr key={e.id}>
+                                <tr key={e.studentId}>
                                     <td style={{ textAlign: 'left', fontWeight: '500' }}>{e.student?.name}</td>
                                     <td style={{ color: '#555' }}>{stats.attendance}</td>
                                     <td style={{ color: '#555' }}>{stats.quizzes}</td>

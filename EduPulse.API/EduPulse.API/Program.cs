@@ -1,4 +1,5 @@
 ﻿using EduPulse.API.Data;
+using EduPulse.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -18,6 +19,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)
     );
 });
+// Register Attendance Service
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 
 // -------------------- CONTROLLERS --------------------
 // ✅ FIX: Added JsonOptions to force camelCase naming (fixes empty tables in React)

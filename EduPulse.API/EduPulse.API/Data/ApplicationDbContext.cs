@@ -21,6 +21,9 @@ namespace EduPulse.API.Data
         public DbSet<Assessment> Assessments { get; set; }
         public DbSet<Grade> Grades { get; set; }
 
+        // ✅ NEW: Attendance Table
+        public DbSet<Attendance> Attendances { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -48,6 +51,31 @@ namespace EduPulse.API.Data
                 .WithMany(u => u.Grades)
                 .HasForeignKey(g => g.StudentId)
                 .OnDelete(DeleteBehavior.NoAction);
+
+            // =========================================================
+            // ✅ NEW: Attendance Configurations
+            // =========================================================
+
+            // 1. Prevent Duplicates: A student can't have two records for the same course on the same day.
+            modelBuilder.Entity<Attendance>()
+                .HasIndex(a => new { a.CourseId, a.StudentId, a.Date })
+                .IsUnique();
+
+            // 2. Relationship: Attendance -> Student
+            // Use NoAction to prevent "Multiple Cascade Paths" error in SQL Server
+            modelBuilder.Entity<Attendance>()
+                .HasOne(a => a.Student)
+                .WithMany() // If you add `public ICollection<Attendance> Attendances { get; set; }` to User, put it here.
+                .HasForeignKey(a => a.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
+
+            // 3. Relationship: Attendance -> Course
+            // If the course is deleted, the attendance records should be deleted (Cascade).
+            modelBuilder.Entity<Attendance>()
+                .HasOne(a => a.Course)
+                .WithMany()
+                .HasForeignKey(a => a.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }
