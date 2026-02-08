@@ -3,7 +3,7 @@ using EduPulse.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims; // Required for identifying the logged-in user
+using System.Security.Claims;
 
 namespace EduPulse.API.Controllers
 {
@@ -25,18 +25,15 @@ namespace EduPulse.API.Controllers
         {
             foreach (var grade in grades)
             {
-                // Check if a grade record already exists for this Student + Assessment combo
                 var existing = await _context.Grades
                     .FirstOrDefaultAsync(g => g.AssessmentId == grade.AssessmentId && g.StudentId == grade.StudentId);
 
                 if (existing != null)
                 {
-                    // Update existing grade
                     existing.MarksObtained = grade.MarksObtained;
                 }
                 else
                 {
-                    // Create new grade entry
                     _context.Grades.Add(grade);
                 }
             }
@@ -45,7 +42,7 @@ namespace EduPulse.API.Controllers
             return Ok(new { message = "Grades updated successfully" });
         }
 
-        // --- METHOD 2: STUDENT VIEWS THEIR OWN RESULT (Updated) ---
+        // --- METHOD 2: STUDENT VIEWS THEIR OWN RESULT (Updated with EnrollmentId) ---
         [HttpGet("student/{courseId}")]
         public async Task<IActionResult> GetMyCourseGrades(int courseId)
         {
@@ -55,30 +52,36 @@ namespace EduPulse.API.Controllers
 
             int studentId = int.Parse(userIdClaim.Value);
 
-            // 2. Get the Course Details (Title, Code, Policy)
+            // 2. Find the Enrollment record for this student and course
+            // This is CRUCIAL for linking to Soft Skills
+            var enrollment = await _context.Enrollments
+                .FirstOrDefaultAsync(e => e.CourseId == courseId && e.StudentId == studentId);
+
+            if (enrollment == null) return NotFound("Student is not enrolled in this course.");
+
+            // 3. Get the Course Details
             var course = await _context.Courses
                 .FirstOrDefaultAsync(c => c.Id == courseId);
 
             if (course == null) return NotFound("Course not found");
 
-            // 3. Get all Assessments for this course (e.g., Quiz 1, Final Exam)
+            // 4. Get all Assessments for this course
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
                 .ToListAsync();
 
-            // 4. Get ONLY this student's grades for those assessments
-            // Use the list of assessment IDs to efficiently filter the grades table
+            // 5. Get ONLY this student's grades
             var assessmentIds = assessments.Select(a => a.Id).ToList();
-
             var grades = await _context.Grades
                 .Where(g => g.StudentId == studentId && assessmentIds.Contains(g.AssessmentId))
                 .ToListAsync();
 
-            // 5. Return the combined data
+            // 6. Return the combined data including enrollmentId
             return Ok(new
             {
-                CourseTitle = course.Title,   // ✅ Added
-                CourseCode = course.Code,     // ✅ Added
+                enrollmentId = enrollment.Id, // <--- ADDED THIS LINE
+                CourseTitle = course.Title,
+                CourseCode = course.Code,
                 Policy = course.GradingPolicy,
                 Assessments = assessments,
                 Grades = grades

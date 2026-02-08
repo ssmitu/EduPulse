@@ -15,11 +15,17 @@ const Gradebook = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCol, setNewCol] = useState({ title: '', type: 1, maxMarks: 20 });
 
+    // --- NEW STATE FOR SOFT SKILLS ---
+    const [selectedEnrollment, setSelectedEnrollment] = useState(null);
+    const [softSkills, setSoftSkills] = useState({
+        discipline: 3,
+        participation: 3,
+        collaboration: 3
+    });
+
     const API_BASE = "https://localhost:7096/api";
     const token = localStorage.getItem('token');
 
-    // 1. DATA FETCHING FUNCTION
-    // We fetch the token inside here to keep the dependency array stable
     const refreshData = useCallback(async () => {
         const localToken = localStorage.getItem('token');
         if (!localToken) return;
@@ -33,29 +39,39 @@ const Gradebook = () => {
         }
     }, [courseId, API_BASE]);
 
-    // 2. INITIAL LOAD
     useEffect(() => {
-        // Use a timeout to move the state update outside the render cycle
-        // to satisfy strict ESLint cascading render rules
         const timer = setTimeout(() => {
             refreshData();
         }, 0);
-
         return () => clearTimeout(timer);
     }, [refreshData]);
 
-    // 3. CHANGE GRADING POLICY
+    // --- NEW HANDLER TO SAVE SOFT SKILLS ---
+    const handleSaveSoftSkills = async () => {
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        try {
+            await axios.post(`${API_BASE}/SoftSkills/upsert`, {
+                enrollmentId: selectedEnrollment.id, // Using e.id from the map
+                ...softSkills
+            }, config);
+            alert(`Soft skills saved for ${selectedEnrollment.student.name}`);
+            setSelectedEnrollment(null);
+        } catch (error) {
+            console.error("Save error:", error);
+            alert("Failed to save soft skills.");
+        }
+    };
+
     const handlePolicyChange = async (newPolicy) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
             await axios.post(`${API_BASE}/Assessments/course/${courseId}/policy`, { policy: newPolicy }, config);
             setData(prev => ({ ...prev, policy: newPolicy }));
-        } catch { // ✅ FIX: Removed unused 'err'
+        } catch {
             alert("Failed to update policy");
         }
     };
 
-    // 4. DELETE COLUMN
     const handleDeleteColumn = async (id) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         if (!window.confirm("Delete this column and all its marks?")) return;
@@ -66,12 +82,11 @@ const Gradebook = () => {
                 assessments: (prev.assessments || []).filter(a => a.id !== id),
                 grades: (prev.grades || []).filter(g => g.assessmentId !== id)
             }));
-        } catch { // ✅ FIX: Removed unused 'err'
+        } catch {
             alert("Delete failed.");
         }
     };
 
-    // 5. ADD NEW ASSESSMENT
     const handleAddColumn = async () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
@@ -81,12 +96,11 @@ const Gradebook = () => {
             );
             setShowAddModal(false);
             refreshData();
-        } catch { // ✅ FIX: Removed unused 'err'
+        } catch {
             alert("Error adding column");
         }
     };
 
-    // 6. UPDATE MARK
     const updateMark = async (studentId, assessmentId, mark) => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
         const numericMark = parseFloat(mark) || 0;
@@ -216,6 +230,33 @@ const Gradebook = () => {
                 </div>
             </div>
 
+            {/* --- NEW EVALUATION MODAL --- */}
+            {selectedEnrollment && (
+                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1001 }}>
+                    <div className="user-info-card" style={{ width: '400px' }}>
+                        <h3>Rate Soft Skills: {selectedEnrollment.student.name}</h3>
+
+                        <div style={{ marginBottom: 15 }}>
+                            <label>Discipline (1-5)</label>
+                            <input type="number" min="1" max="5" className="form-input" style={{ width: '100%' }} value={softSkills.discipline} onChange={e => setSoftSkills({ ...softSkills, discipline: parseInt(e.target.value) })} />
+                        </div>
+                        <div style={{ marginBottom: 15 }}>
+                            <label>Participation (1-5)</label>
+                            <input type="number" min="1" max="5" className="form-input" style={{ width: '100%' }} value={softSkills.participation} onChange={e => setSoftSkills({ ...softSkills, participation: parseInt(e.target.value) })} />
+                        </div>
+                        <div style={{ marginBottom: 15 }}>
+                            <label>Collaboration (1-5)</label>
+                            <input type="number" min="1" max="5" className="form-input" style={{ width: '100%' }} value={softSkills.collaboration} onChange={e => setSoftSkills({ ...softSkills, collaboration: parseInt(e.target.value) })} />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button onClick={handleSaveSoftSkills} className="btn-approve" style={{ flex: 1 }}>Save Ratings</button>
+                            <button onClick={() => setSelectedEnrollment(null)} className="btn-action" style={{ flex: 1, backgroundColor: 'gray' }}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="admin-section" style={{ marginTop: 30 }}>
                 <h3>Step 2: Promotion Engine</h3>
                 <table className="admin-table">
@@ -227,6 +268,7 @@ const Gradebook = () => {
                             <th>Final (70)</th>
                             <th>Total Weighted Score</th>
                             <th>Status</th>
+                            <th>Behavior</th> {/* NEW COLUMN */}
                         </tr>
                     </thead>
                     <tbody>
@@ -243,6 +285,15 @@ const Gradebook = () => {
                                         <span className={parseFloat(stats.total) >= 40 ? 'status-regular' : 'status-irregular'}>
                                             {parseFloat(stats.total) >= 40 ? 'PASS' : 'FAIL'}
                                         </span>
+                                    </td>
+                                    <td>
+                                        <button
+                                            onClick={() => setSelectedEnrollment(e)}
+                                            className="btn-action"
+                                            style={{ backgroundColor: '#f39c12', padding: '5px 10px' }}
+                                        >
+                                            ⭐ Rate
+                                        </button>
                                     </td>
                                 </tr>
                             )

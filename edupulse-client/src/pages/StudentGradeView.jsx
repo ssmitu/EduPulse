@@ -1,46 +1,97 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+// --- NEW IMPORTS FOR CHART ---
+import {
+    Chart as ChartJS,
+    RadialLinearScale,
+    PointElement,
+    LineElement,
+    Filler,
+    Tooltip,
+    Legend,
+} from 'chart.js';
+import { Radar } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
 const StudentGradeView = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
 
     const [data, setData] = useState({
-        courseTitle: '', // Added field
-        courseCode: '',  // Added field
+        courseTitle: '',
+        courseCode: '',
         policy: '',
         assessments: [],
-        grades: []
+        grades: [],
+        enrollmentId: null // We need this to fetch soft skills
     });
+    const [softSkills, setSoftSkills] = useState(null); // --- NEW STATE ---
     const [loading, setLoading] = useState(true);
 
     const API_BASE = "https://localhost:7096/api";
 
     useEffect(() => {
-        const fetchMyGrades = async () => {
+        const fetchAllData = async () => {
             const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+
             try {
-                const res = await axios.get(`${API_BASE}/Grades/student/${courseId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                // 1. Fetch Grades
+                const res = await axios.get(`${API_BASE}/Grades/student/${courseId}`, config);
                 setData(res.data);
+
+                // 2. Fetch Soft Skills using the EnrollmentId returned from the grades call
+                // Note: If your backend doesn't return enrollmentId in the grades object, 
+                // you might need to adjust the backend GradesController to include it.
+                if (res.data.enrollmentId) {
+                    const skillRes = await axios.get(`${API_BASE}/SoftSkills/enrollment/${res.data.enrollmentId}`, config);
+                    setSoftSkills(skillRes.data);
+                }
             } catch (error) {
-                console.error("Error fetching grades:", error);
-                alert("Could not load grades.");
+                console.error("Error fetching data:", error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchMyGrades();
+        fetchAllData();
     }, [courseId]);
+
+    // --- RADAR CHART DATA SETUP ---
+    const radarData = {
+        labels: ['Discipline', 'Participation', 'Collaboration'],
+        datasets: [
+            {
+                label: 'Behavioral Rating (1-5)',
+                data: [
+                    softSkills?.discipline || 0,
+                    softSkills?.participation || 0,
+                    softSkills?.collaboration || 0
+                ],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+            },
+        ],
+    };
+
+    const radarOptions = {
+        scales: {
+            r: {
+                angleLines: { display: true },
+                suggestedMin: 0,
+                suggestedMax: 5,
+                ticks: { stepSize: 1, display: false }
+            }
+        }
+    };
 
     const calculateStats = () => {
         const myGrades = data.grades || [];
         const quizAssessments = (data.assessments || []).filter(a => a.type === 1);
-
-        // 1. Calculate Quiz Score
         let quizScore = 0;
         if (quizAssessments.length > 0) {
             const scores = quizAssessments.map(a => {
@@ -48,32 +99,23 @@ const StudentGradeView = () => {
                 return g ? (parseFloat(g.marksObtained) || 0) : 0;
             });
             scores.sort((a, b) => b - a);
-
             const pickCount = data.policy?.includes('Best 3') ? 3 : 2;
             const sum = scores.slice(0, pickCount).reduce((acc, val) => acc + val, 0);
-
-            // Average the best quizzes
             quizScore = sum / pickCount;
         }
-
-        // 2. Calculate Attendance
         let attdScore = 0;
         const attd = (data.assessments || []).find(a => a.type === 0);
         if (attd) {
             const g = myGrades.find(gr => gr.assessmentId === attd.id);
             attdScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
         }
-
-        // 3. Calculate Final Exam
         let finalScore = 0;
         const final = (data.assessments || []).find(a => a.type === 3);
         if (final) {
             const g = myGrades.find(gr => gr.assessmentId === final.id);
             finalScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
         }
-
         const total = quizScore + attdScore + finalScore;
-
         return {
             attendance: attdScore.toFixed(2),
             quizzes: quizScore.toFixed(2),
@@ -91,23 +133,16 @@ const StudentGradeView = () => {
         <div className="dashboard-container">
             <div className="header-strip">
                 <button onClick={() => navigate(-1)} className="btn-action">← Back</button>
-
-                {/* ✅ UPDATED HEADER: Shows Course No and Name separately */}
                 <div style={{ textAlign: 'right' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.5rem' }}>
-                        Course No: {data.courseCode}
-                    </h2>
-                    <span style={{ fontSize: '1.1rem', color: '#555', fontWeight: '500' }}>
-                        Course Name: {data.courseTitle}
-                    </span>
+                    <h2 style={{ margin: 0, fontSize: '1.5rem' }}>Course No: {data.courseCode}</h2>
+                    <span style={{ fontSize: '1.1rem', color: '#555', fontWeight: '500' }}>Course Name: {data.courseTitle}</span>
                 </div>
             </div>
 
             <div className="user-info-card" style={{ marginTop: '20px' }}>
-                {/* ✅ REMOVED: The "Grading Policy" text is gone */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '20px', marginTop: '10px' }}>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '10px' }}>
-                    {/* LEFT: Detailed Breakdown */}
+                    {/* LEFT: Assessment Breakdown */}
                     <div>
                         <h4>Assessment Breakdown</h4>
                         <table className="admin-table">
@@ -131,24 +166,35 @@ const StudentGradeView = () => {
                         </table>
                     </div>
 
+                    {/* MIDDLE: NEW RADAR CHART */}
+                    <div style={{ textAlign: 'center', borderLeft: '1px solid #eee', borderRight: '1px solid #eee', padding: '0 10px' }}>
+                        <h4>Behavioral Evaluation</h4>
+                        <div style={{ width: '100%', maxWidth: '250px', margin: '0 auto' }}>
+                            <Radar data={radarData} options={radarOptions} />
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '10px' }}>
+                            Discipline, Participation, & Collaboration
+                        </p>
+                    </div>
+
                     {/* RIGHT: Final Calculation */}
                     <div>
                         <h4>Final Score Calculation</h4>
-                        <div className="course-card" style={{ cursor: 'default' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="course-card" style={{ cursor: 'default', padding: '15px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <span>Attendance (10%):</span>
                                 <strong>{stats.attendance}</strong>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <span>Quizzes (20%):</span>
                                 <strong>{stats.quizzes}</strong>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <span>Final Exam (70%):</span>
                                 <strong>{stats.final}</strong>
                             </div>
                             <hr />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '1.2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '1.2rem' }}>
                                 <span>Total:</span>
                                 <strong>{stats.total}%</strong>
                             </div>
@@ -165,6 +211,7 @@ const StudentGradeView = () => {
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>

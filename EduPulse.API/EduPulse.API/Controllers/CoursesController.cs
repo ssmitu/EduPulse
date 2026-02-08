@@ -164,24 +164,23 @@ namespace EduPulse.API.Controllers
         }
 
         // 4. GET: Enrolled students
-        [HttpGet("{courseId}/students")]
-        public async Task<IActionResult> GetEnrolledStudents(int courseId)
+        [HttpGet("{id}/students")]
+        public async Task<IActionResult> GetStudentsInCourse(int id)
         {
             var students = await _context.Enrollments
-                .Where(e => e.CourseId == courseId)
+                .Where(e => e.CourseId == id)
                 .Include(e => e.Student)
-                .Select(e => new
-                {
-                    e.StudentId,
-                    e.Student!.Name,
-                    e.Student.Email,
-                    e.Status
+                .Select(e => new {
+                    EnrollmentId = e.Id, // <--- MAKE SURE THIS LINE EXISTS
+                    StudentId = e.StudentId,
+                    Name = e.Student.Name,
+                    Email = e.Student.Email,
+                    Status = e.Status.ToString()
                 })
                 .ToListAsync();
 
             return Ok(students);
         }
-
         // 5. POST: Toggle Publish status
         [HttpPost("{id}/publish")]
         public async Task<IActionResult> TogglePublish(int id)
