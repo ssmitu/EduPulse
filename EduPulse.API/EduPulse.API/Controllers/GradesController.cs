@@ -26,53 +26,77 @@ namespace EduPulse.API.Controllers
         [HttpGet("course/{courseId}")]
         public async Task<IActionResult> GetCourseGradebook(int courseId)
         {
+            // 1. Get Assessments
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
+                .AsNoTracking()
                 .ToListAsync();
 
+            // 2. Get Enrollments (Students)
             var enrollments = await _context.Enrollments
                 .Where(e => e.CourseId == courseId)
                 .Include(e => e.Student)
+                .AsNoTracking()
                 .ToListAsync();
 
+            // 3. Get Grades for these assessments
             var assessmentIds = assessments.Select(a => a.Id).ToList();
             var grades = await _context.Grades
                 .Where(g => assessmentIds.Contains(g.AssessmentId))
                 .ToListAsync();
 
-            var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == AssessmentType.Attendance);
+            // 4. Calculate Attendance Automatically
+            var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == 0); // Assuming 0 is Attendance in your Enum
 
-            // LIVE OVERRIDE FOR ATTENDANCE
             if (attendanceAssessment != null)
             {
                 foreach (var enrollment in enrollments)
                 {
-                    var summary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, enrollment.StudentId);
-                    var studentAttendanceGrade = grades.FirstOrDefault(g =>
-                        g.AssessmentId == attendanceAssessment.Id &&
-                        g.StudentId == enrollment.StudentId);
+                    try
+                    {
+                        // Calculate stats using the service
+                        var summary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, enrollment.StudentId);
 
-                    if (studentAttendanceGrade != null)
-                    {
-                        studentAttendanceGrade.MarksObtained = summary.GradePoints;
-                    }
-                    else
-                    {
-                        grades.Add(new Grade
+                        // Find existing grade in memory (from the list we just fetched)
+                        var studentAttendanceGrade = grades.FirstOrDefault(g =>
+                            g.AssessmentId == attendanceAssessment.Id &&
+                            g.StudentId == enrollment.StudentId);
+
+                        if (studentAttendanceGrade != null)
                         {
-                            AssessmentId = attendanceAssessment.Id,
-                            StudentId = enrollment.StudentId,
-                            MarksObtained = summary.GradePoints
-                        });
+                            // Update the in-memory value (for display only, not saving to DB here)
+                            studentAttendanceGrade.MarksObtained = summary.GradePoints;
+                        }
+                        else
+                        {
+                            // Add a virtual grade for display
+                            grades.Add(new Grade
+                            {
+                                AssessmentId = attendanceAssessment.Id,
+                                StudentId = enrollment.StudentId,
+                                MarksObtained = summary.GradePoints
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error calculating attendance for student {enrollment.StudentId}: {ex.Message}");
+                        // Continue loop so one failure doesn't break the whole gradebook
                     }
                 }
             }
 
+            // 5. Return JSON
             return Ok(new
             {
                 Assessments = assessments,
                 Grades = grades,
-                Students = enrollments.Select(e => new { e.StudentId, e.Student?.Name })
+                // ✅ FIX: Explicitly naming properties so Frontend .map(s => s.name) works
+                Students = enrollments.Select(e => new
+                {
+                    StudentId = e.StudentId,
+                    Name = e.Student != null ? e.Student.Name : "Unknown Student"
+                })
             });
         }
 
@@ -91,6 +115,8 @@ namespace EduPulse.API.Controllers
                 }
                 else
                 {
+                    // Ensure we are not inserting with ID if it's auto-generated
+                    grade.Id = 0;
                     _context.Grades.Add(grade);
                 }
             }
@@ -106,13 +132,16 @@ namespace EduPulse.API.Controllers
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null) return Unauthorized();
 
-            int studentId = int.Parse(userIdClaim.Value);
+            if (!int.TryParse(userIdClaim.Value, out int studentId))
+            {
+                return BadRequest("Invalid User ID in token.");
+            }
 
             // 1. Get Course Details
             var course = await _context.Courses.FirstOrDefaultAsync(c => c.Id == courseId);
             if (course == null) return NotFound("Course not found");
 
-            // 2. Find Enrollment (Crucial for teammate's Soft Skills UI)
+            // 2. Find Enrollment
             var enrollment = await _context.Enrollments
                 .FirstOrDefaultAsync(e => e.CourseId == courseId && e.StudentId == studentId);
 
@@ -121,32 +150,41 @@ namespace EduPulse.API.Controllers
             // 3. Get Assessments and Grades
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
+                .AsNoTracking()
                 .ToListAsync();
 
             var assessmentIds = assessments.Select(a => a.Id).ToList();
             var grades = await _context.Grades
                 .Where(g => g.StudentId == studentId && assessmentIds.Contains(g.AssessmentId))
+                .AsNoTracking()
                 .ToListAsync();
 
             // 4. Handle LIVE Attendance Grade
-            var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == AssessmentType.Attendance);
+            var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == 0); // 0 = Attendance
             if (attendanceAssessment != null)
             {
-                var attendanceSummary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
-                var attendanceGrade = grades.FirstOrDefault(g => g.AssessmentId == attendanceAssessment.Id);
+                try
+                {
+                    var attendanceSummary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
+                    var attendanceGrade = grades.FirstOrDefault(g => g.AssessmentId == attendanceAssessment.Id);
 
-                if (attendanceGrade != null)
-                {
-                    attendanceGrade.MarksObtained = attendanceSummary.GradePoints;
-                }
-                else
-                {
-                    grades.Add(new Grade
+                    if (attendanceGrade != null)
                     {
-                        AssessmentId = attendanceAssessment.Id,
-                        StudentId = studentId,
-                        MarksObtained = attendanceSummary.GradePoints
-                    });
+                        attendanceGrade.MarksObtained = attendanceSummary.GradePoints;
+                    }
+                    else
+                    {
+                        grades.Add(new Grade
+                        {
+                            AssessmentId = attendanceAssessment.Id,
+                            StudentId = studentId,
+                            MarksObtained = attendanceSummary.GradePoints
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error calculating student attendance: {ex.Message}");
                 }
             }
 
