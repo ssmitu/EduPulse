@@ -1,17 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-// --- NEW IMPORTS FOR CHART ---
-import {
-    Chart as ChartJS,
-    RadialLinearScale,
-    PointElement,
-    LineElement,
-    Filler,
-    Tooltip,
-    Legend,
-} from 'chart.js';
-import { Radar } from 'react-chartjs-2';
+// ✅ Import the new component
+import AttendanceProgress from './AttendanceProgress';
 
 // Register Chart.js components
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
@@ -92,6 +83,7 @@ const StudentGradeView = () => {
     const calculateStats = () => {
         const myGrades = data.grades || [];
         const quizAssessments = (data.assessments || []).filter(a => a.type === 1);
+
         let quizScore = 0;
         if (quizAssessments.length > 0) {
             const scores = quizAssessments.map(a => {
@@ -103,12 +95,14 @@ const StudentGradeView = () => {
             const sum = scores.slice(0, pickCount).reduce((acc, val) => acc + val, 0);
             quizScore = sum / pickCount;
         }
+
         let attdScore = 0;
         const attd = (data.assessments || []).find(a => a.type === 0);
         if (attd) {
             const g = myGrades.find(gr => gr.assessmentId === attd.id);
             attdScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
         }
+
         let finalScore = 0;
         const final = (data.assessments || []).find(a => a.type === 3);
         if (final) {
@@ -140,7 +134,9 @@ const StudentGradeView = () => {
             </div>
 
             <div className="user-info-card" style={{ marginTop: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: '20px', marginTop: '10px' }}>
+
+                {/* ✅ NEW: Visual Attendance Progress Bar shows up first */}
+                <AttendanceProgress courseId={courseId} />
 
                     {/* LEFT: Assessment Breakdown */}
                     <div>

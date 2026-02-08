@@ -179,12 +179,23 @@ const TeacherCourses = () => {
                                     {c.deptName} (Y{c.year} S{c.semester})
                                 </td>
                                 <td>
+                                    {/* ✅ ADDED: Mark Attendance Button */}
+                                    <button
+                                        onClick={() => navigate(`/attendance/${c.id}`)}
+                                        className="btn-action"
+                                        style={{ marginRight: '5px', backgroundColor: '#6f42c1', color: 'white' }}
+                                    >
+                                        Mark Attendance
+                                    </button>
+
                                     <button
                                         onClick={() => handleSync(c.id)}
                                         className="btn-approve"
+                                        style={{ marginRight: '5px' }}
                                     >
                                         Sync Batch
                                     </button>
+
                                     <button
                                         onClick={() => navigate(`/course-details/${c.id}`)}
                                         className="btn-action btn-view-students"

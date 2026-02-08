@@ -448,3 +448,106 @@ body {
         color: #52796f;
         margin-top: 8px;
     }
+/* Attendance Component Styles */
+.attendance-combined-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.attendance-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.attendance-label {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 1rem;
+}
+
+.attendance-count {
+    color: #64748b;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Progress Bar Container */
+.attendance-progress-bg {
+    height: 12px;
+    background-color: #f1f5f9;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+/* Progress Bar Fill */
+.attendance-progress-fill {
+    height: 100%;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Color States */
+.status-good {
+    background-color: #22c55e;
+}
+/* Green */
+.status-warning {
+    background-color: #f59e0b;
+}
+/* Yellow/Orange */
+.status-danger {
+    background-color: #ef4444;
+}
+/* Red */
+
+/* Score Row */
+.attendance-score-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px dashed #e2e8f0;
+}
+
+.percentage-text {
+    display: block;
+    font-weight: 600;
+    color: #334155;
+}
+
+.scale-hint {
+    font-size: 0.75rem;
+    color: #94a3b8;
+}
+
+.score-mark-box {
+    text-align: right;
+}
+
+.mark-label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    color: #64748b;
+    margin-bottom: 2px;
+}
+
+.mark-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #2563eb; /* Primary EduPulse Blue */
+}
+
+.attendance-loading {
+    padding: 20px;
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+}
