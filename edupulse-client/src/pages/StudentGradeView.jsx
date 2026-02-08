@@ -4,6 +4,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 // ✅ Import the new component
 import AttendanceProgress from './AttendanceProgress';
 
+// Register Chart.js components
+ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
+
 const StudentGradeView = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
@@ -13,30 +16,69 @@ const StudentGradeView = () => {
         courseCode: '',
         policy: '',
         assessments: [],
-        grades: []
+        grades: [],
+        enrollmentId: null // We need this to fetch soft skills
     });
+    const [softSkills, setSoftSkills] = useState(null); // --- NEW STATE ---
     const [loading, setLoading] = useState(true);
 
     const API_BASE = "https://localhost:7096/api";
 
     useEffect(() => {
-        const fetchMyGrades = async () => {
+        const fetchAllData = async () => {
             const token = localStorage.getItem('token');
+            const config = { headers: { Authorization: `Bearer ${token}` } };
+
             try {
-                const res = await axios.get(`${API_BASE}/Grades/student/${courseId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                // 1. Fetch Grades
+                const res = await axios.get(`${API_BASE}/Grades/student/${courseId}`, config);
                 setData(res.data);
+
+                // 2. Fetch Soft Skills using the EnrollmentId returned from the grades call
+                // Note: If your backend doesn't return enrollmentId in the grades object, 
+                // you might need to adjust the backend GradesController to include it.
+                if (res.data.enrollmentId) {
+                    const skillRes = await axios.get(`${API_BASE}/SoftSkills/enrollment/${res.data.enrollmentId}`, config);
+                    setSoftSkills(skillRes.data);
+                }
             } catch (error) {
-                console.error("Error fetching grades:", error);
-                alert("Could not load grades.");
+                console.error("Error fetching data:", error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchMyGrades();
+        fetchAllData();
     }, [courseId]);
+
+    // --- RADAR CHART DATA SETUP ---
+    const radarData = {
+        labels: ['Discipline', 'Participation', 'Collaboration'],
+        datasets: [
+            {
+                label: 'Behavioral Rating (1-5)',
+                data: [
+                    softSkills?.discipline || 0,
+                    softSkills?.participation || 0,
+                    softSkills?.collaboration || 0
+                ],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 2,
+            },
+        ],
+    };
+
+    const radarOptions = {
+        scales: {
+            r: {
+                angleLines: { display: true },
+                suggestedMin: 0,
+                suggestedMax: 5,
+                ticks: { stepSize: 1, display: false }
+            }
+        }
+    };
 
     const calculateStats = () => {
         const myGrades = data.grades || [];
@@ -67,9 +109,7 @@ const StudentGradeView = () => {
             const g = myGrades.find(gr => gr.assessmentId === final.id);
             finalScore = g ? (parseFloat(g.marksObtained) || 0) : 0;
         }
-
         const total = quizScore + attdScore + finalScore;
-
         return {
             attendance: attdScore.toFixed(2),
             quizzes: quizScore.toFixed(2),
@@ -98,8 +138,7 @@ const StudentGradeView = () => {
                 {/* ✅ NEW: Visual Attendance Progress Bar shows up first */}
                 <AttendanceProgress courseId={courseId} />
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '10px' }}>
-                    {/* LEFT: Detailed Breakdown */}
+                    {/* LEFT: Assessment Breakdown */}
                     <div>
                         <h4>Assessment Breakdown</h4>
                         <table className="admin-table">
@@ -123,24 +162,35 @@ const StudentGradeView = () => {
                         </table>
                     </div>
 
+                    {/* MIDDLE: NEW RADAR CHART */}
+                    <div style={{ textAlign: 'center', borderLeft: '1px solid #eee', borderRight: '1px solid #eee', padding: '0 10px' }}>
+                        <h4>Behavioral Evaluation</h4>
+                        <div style={{ width: '100%', maxWidth: '250px', margin: '0 auto' }}>
+                            <Radar data={radarData} options={radarOptions} />
+                        </div>
+                        <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '10px' }}>
+                            Discipline, Participation, & Collaboration
+                        </p>
+                    </div>
+
                     {/* RIGHT: Final Calculation */}
                     <div>
                         <h4>Final Score Calculation</h4>
-                        <div className="course-card" style={{ cursor: 'default' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                        <div className="course-card" style={{ cursor: 'default', padding: '15px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <span>Attendance (10%):</span>
                                 <strong>{stats.attendance}</strong>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <span>Quizzes (20%):</span>
                                 <strong>{stats.quizzes}</strong>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                                 <span>Final Exam (70%):</span>
                                 <strong>{stats.final}</strong>
                             </div>
                             <hr />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', fontSize: '1.2rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '1.2rem' }}>
                                 <span>Total:</span>
                                 <strong>{stats.total}%</strong>
                             </div>
@@ -157,6 +207,7 @@ const StudentGradeView = () => {
                             </div>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>

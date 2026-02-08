@@ -121,6 +121,17 @@ namespace EduPulse.API.Controllers
             int studentId = int.Parse(userIdClaim.Value);
 
             var course = await _context.Courses.FirstOrDefaultAsync(c => c.Id == courseId);
+            // 2. Find the Enrollment record for this student and course
+            // This is CRUCIAL for linking to Soft Skills
+            var enrollment = await _context.Enrollments
+                .FirstOrDefaultAsync(e => e.CourseId == courseId && e.StudentId == studentId);
+
+            if (enrollment == null) return NotFound("Student is not enrolled in this course.");
+
+            // 3. Get the Course Details
+            var course = await _context.Courses
+                .FirstOrDefaultAsync(c => c.Id == courseId);
+
             if (course == null) return NotFound("Course not found");
 
             var assessments = await _context.Assessments

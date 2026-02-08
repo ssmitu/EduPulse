@@ -117,8 +117,16 @@ namespace EduPulse.API.Controllers
         [HttpPost("approve-teacher/{id}")]
         public async Task<IActionResult> ApproveTeacher(string id)
         {
-            var teacher = await _context.Users.FindAsync(id);
-            if (teacher == null) return NotFound();
+            // Convert the string id to an integer
+            if (!int.TryParse(id, out int teacherId))
+            {
+                return BadRequest("Invalid Teacher ID format.");
+            }
+
+            // Use the integer teacherId here
+            var teacher = await _context.Users.FindAsync(teacherId);
+
+            if (teacher == null) return NotFound("Teacher not found.");
 
             teacher.IsVerified = true;
             await _context.SaveChangesAsync();

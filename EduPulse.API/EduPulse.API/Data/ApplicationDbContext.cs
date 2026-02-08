@@ -20,6 +20,7 @@ namespace EduPulse.API.Data
         public DbSet<CourseMaterial> CourseMaterials { get; set; }
         public DbSet<Assessment> Assessments { get; set; }
         public DbSet<Grade> Grades { get; set; }
+        public DbSet<SoftSkill> SoftSkills { get; set; }
 
         // ✅ NEW: Attendance Table
         public DbSet<Attendance> Attendances { get; set; }
