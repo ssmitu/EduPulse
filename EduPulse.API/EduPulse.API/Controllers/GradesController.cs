@@ -22,53 +22,42 @@ namespace EduPulse.API.Controllers
             _attendanceService = attendanceService;
         }
 
-        // --- METHOD 1: TEACHER VIEWS THE WHOLE GRADEBOOK (The Missing Piece) ---
+        // --- METHOD 1: TEACHER VIEWS THE WHOLE GRADEBOOK ---
         [HttpGet("course/{courseId}")]
         public async Task<IActionResult> GetCourseGradebook(int courseId)
         {
-            // 1. Get all assessments for this course
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
                 .ToListAsync();
 
-            // 2. Get all enrolled students
             var enrollments = await _context.Enrollments
                 .Where(e => e.CourseId == courseId)
                 .Include(e => e.Student)
                 .ToListAsync();
 
-            // 3. Get all existing grades
             var assessmentIds = assessments.Select(a => a.Id).ToList();
             var grades = await _context.Grades
                 .Where(g => assessmentIds.Contains(g.AssessmentId))
                 .ToListAsync();
 
-            // Find which assessment is the "Attendance" type
             var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == AssessmentType.Attendance);
 
-            // =========================================================
-            // ✅ LIVE OVERRIDE FOR ALL STUDENTS
-            // =========================================================
+            // LIVE OVERRIDE FOR ATTENDANCE
             if (attendanceAssessment != null)
             {
                 foreach (var enrollment in enrollments)
                 {
-                    // Calculate live score for this specific student
                     var summary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, enrollment.StudentId);
-
-                    // Find their attendance grade in our list
                     var studentAttendanceGrade = grades.FirstOrDefault(g =>
                         g.AssessmentId == attendanceAssessment.Id &&
                         g.StudentId == enrollment.StudentId);
 
                     if (studentAttendanceGrade != null)
                     {
-                        // Update the list value before sending to UI
                         studentAttendanceGrade.MarksObtained = summary.GradePoints;
                     }
                     else
                     {
-                        // If no grade exists in DB, add a "Virtual Grade" to the list for the UI
                         grades.Add(new Grade
                         {
                             AssessmentId = attendanceAssessment.Id,
@@ -78,7 +67,6 @@ namespace EduPulse.API.Controllers
                     }
                 }
             }
-            // =========================================================
 
             return Ok(new
             {
@@ -111,7 +99,7 @@ namespace EduPulse.API.Controllers
             return Ok(new { message = "Grades updated successfully" });
         }
 
-        // --- METHOD 3: STUDENT VIEWS THEIR OWN RESULT ---
+        // --- METHOD 3: STUDENT VIEWS THEIR OWN RESULT (Attendance + Soft Skills) ---
         [HttpGet("student/{courseId}")]
         public async Task<IActionResult> GetMyCourseGrades(int courseId)
         {
@@ -120,20 +108,17 @@ namespace EduPulse.API.Controllers
 
             int studentId = int.Parse(userIdClaim.Value);
 
+            // 1. Get Course Details
             var course = await _context.Courses.FirstOrDefaultAsync(c => c.Id == courseId);
-            // 2. Find the Enrollment record for this student and course
-            // This is CRUCIAL for linking to Soft Skills
+            if (course == null) return NotFound("Course not found");
+
+            // 2. Find Enrollment (Crucial for teammate's Soft Skills UI)
             var enrollment = await _context.Enrollments
                 .FirstOrDefaultAsync(e => e.CourseId == courseId && e.StudentId == studentId);
 
             if (enrollment == null) return NotFound("Student is not enrolled in this course.");
 
-            // 3. Get the Course Details
-            var course = await _context.Courses
-                .FirstOrDefaultAsync(c => c.Id == courseId);
-
-            if (course == null) return NotFound("Course not found");
-
+            // 3. Get Assessments and Grades
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
                 .ToListAsync();
@@ -143,8 +128,8 @@ namespace EduPulse.API.Controllers
                 .Where(g => g.StudentId == studentId && assessmentIds.Contains(g.AssessmentId))
                 .ToListAsync();
 
+            // 4. Handle LIVE Attendance Grade
             var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == AssessmentType.Attendance);
-
             if (attendanceAssessment != null)
             {
                 var attendanceSummary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
@@ -165,11 +150,13 @@ namespace EduPulse.API.Controllers
                 }
             }
 
+            // 5. Final Combined Result
             return Ok(new
             {
                 CourseTitle = course.Title,
                 CourseCode = course.Code,
                 Policy = course.GradingPolicy,
+                EnrollmentId = enrollment.Id, // <--- Link for Soft Skills
                 Assessments = assessments,
                 Grades = grades
             });
