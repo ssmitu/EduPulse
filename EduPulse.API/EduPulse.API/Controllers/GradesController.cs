@@ -1,9 +1,10 @@
 ﻿using EduPulse.API.Data;
+using EduPulse.API.DTOs;
 using EduPulse.API.Models;
 using EduPulse.API.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace EduPulse.API.Controllers
@@ -198,6 +199,76 @@ namespace EduPulse.API.Controllers
                 Assessments = assessments,
                 Grades = grades
             });
+        }
+
+        // GET: api/Grades/gap-analysis/{courseId}
+        // GET: api/Grades/gap-analysis/{courseId}
+        // GET: api/Grades/gap-analysis/{courseId}
+        // GET: api/Grades/gap-analysis/{courseId}
+        [HttpGet("gap-analysis/{courseId}")]
+        public async Task<IActionResult> GetGapAnalysis(int courseId)
+        {
+            // 1. Get logged-in student ID
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (userIdClaim == null) return Unauthorized();
+            int studentId = int.Parse(userIdClaim.Value);
+
+            // 2. Fetch all assessments for this course
+            var assessments = await _context.Assessments
+                .Where(a => a.CourseId == courseId)
+                .ToListAsync();
+
+            // 3. Fetch all Student IDs enrolled in this course (THIS WAS MISSING IN YOUR CODE)
+            var allStudentIds = await _context.Enrollments
+                .Where(e => e.CourseId == courseId)
+                .Select(e => e.StudentId)
+                .ToListAsync();
+
+            var analysis = new List<GapAnalysisDto>();
+
+            foreach (var a in assessments)
+            {
+                double myMark = 0;
+                double classAvgMark = 0;
+
+                if (a.Type == 0) // Attendance Type
+                {
+                    // Get My Live Attendance
+                    var myAttd = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
+                    myMark = myAttd.GradePoints;
+
+                    // Calculate Class Average Attendance
+                    double totalAttendancePoints = 0;
+                    foreach (var id in allStudentIds)
+                    {
+                        var summary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, id);
+                        totalAttendancePoints += summary.GradePoints;
+                    }
+                    classAvgMark = allStudentIds.Count > 0 ? totalAttendancePoints / allStudentIds.Count : 0;
+                }
+                else // Quiz / Exam Type
+                {
+                    // Get My Mark
+                    myMark = await _context.Grades
+                        .Where(g => g.AssessmentId == a.Id && g.StudentId == studentId)
+                        .Select(g => (double?)g.MarksObtained).FirstOrDefaultAsync() ?? 0;
+
+                    // Get Class Average Mark
+                    // Get Class Average Mark
+                    classAvgMark = await _context.Grades
+                        .Where(g => g.AssessmentId == a.Id)
+                        .AverageAsync(g => (double?)g.MarksObtained) ?? 0;
+                }
+
+                analysis.Add(new GapAnalysisDto
+                {
+                    AssessmentTitle = a.Title,
+                    MyPercentage = a.MaxMarks > 0 ? (myMark / (double)a.MaxMarks) * 100 : 0,
+                    ClassAveragePercentage = a.MaxMarks > 0 ? (classAvgMark / (double)a.MaxMarks) * 100 : 0
+                });
+            }
+
+            return Ok(analysis);
         }
     }
 }
