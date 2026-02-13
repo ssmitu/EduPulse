@@ -9,6 +9,7 @@ const Dashboard = () => {
     const [myCourses, setMyCourses] = useState([]);
     const navigate = useNavigate();
 
+    // --- ACTIONS ---
     const approveTeacher = async (id) => {
         try {
             await API.post(`/Auth/approve-teacher/${id}`);
@@ -25,9 +26,11 @@ const Dashboard = () => {
         navigate('/login');
     };
 
+    // --- EFFECTS ---
+
+    // 1. Fetch Pending Teachers (Admin Only)
     useEffect(() => {
         if (user?.role !== 'Admin') return;
-
         let cancelled = false;
 
         API.get('/Auth/pending-teachers')
@@ -39,9 +42,9 @@ const Dashboard = () => {
         return () => { cancelled = true; };
     }, [user?.role]);
 
+    // 2. Fetch Courses (Student & Teacher)
     useEffect(() => {
         if (!user) return;
-
         let cancelled = false;
 
         if (user.role === 'Teacher' || user.role === 'Student') {
@@ -55,6 +58,7 @@ const Dashboard = () => {
         return () => { cancelled = true; };
     }, [user]);
 
+    // --- RENDER HELPERS ---
     if (!user) {
         return <div className="dashboard-container">Loading...</div>;
     }
@@ -69,7 +73,7 @@ const Dashboard = () => {
                 </button>
             </div>
 
-            {/* User Info */}
+            {/* User Info Card */}
             <div className="user-info-card">
                 <h2>Welcome, {user.name}!</h2>
                 <p><strong>Email:</strong> {user.email}</p>
@@ -80,7 +84,7 @@ const Dashboard = () => {
                 )}
             </div>
 
-            {/* Admin Section */}
+            {/* --- ADMIN SECTION --- */}
             {user.role === 'Admin' && (
                 <div className="admin-section">
                     <h3>Pending Teacher Approvals</h3>
@@ -97,7 +101,7 @@ const Dashboard = () => {
                             </thead>
                             <tbody>
                                 {pendingTeachers.map(t => (
-                                    <tr key={t.id}>
+                                    <tr key={t.id}> {/* ✅ KEY PROP IS CORRECT HERE */}
                                         <td>{t.name}</td>
                                         <td>{t.email}</td>
                                         <td>
@@ -116,7 +120,7 @@ const Dashboard = () => {
                 </div>
             )}
 
-            {/* Courses Section */}
+            {/* --- COURSES SECTION --- */}
             {(user.role === 'Student' || user.role === 'Teacher') && (
                 <div className="courses-section">
                     <div className="courses-header">
@@ -134,7 +138,7 @@ const Dashboard = () => {
                         ) : (
                             myCourses.map(course => (
                                 <div
-                                    key={course.id}
+                                    key={course.id} /* ✅ KEY PROP IS CORRECT HERE */
                                     className="course-card"
                                     onClick={() => navigate(`/course-content/${course.id}`)}
                                 >
@@ -147,53 +151,48 @@ const Dashboard = () => {
                                         Year {course.year} Sem {course.semester}
                                     </span>
 
-                                    {/* TEACHER ACTIONS: Manage Students & Gradebook */}
+                                    {/* TEACHER ACTIONS */}
                                     {user.role === 'Teacher' && (
-                                        <div className="course-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: '15px', display: 'flex', gap: '10px' }}>
+                                        <div
+                                            className="course-card-actions"
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ marginTop: '15px', display: 'flex', gap: '10px' }}
+                                        >
                                             <button
                                                 onClick={() => navigate(`/course/${course.id}/gradebook`)}
                                                 className="btn-approve"
-                                                style={{
-                                                    fontSize: '0.85rem',
-                                                    padding: '5px 10px',
-                                                    backgroundColor: '#6b46c1',
-                                                    flex: 1
-                                                }}
+                                                style={{ flex: 1, backgroundColor: '#6b46c1' }}
                                             >
                                                 📊 Gradebook
                                             </button>
 
-                                            {/* ✅ NEW: Attendance Button for Teachers */}
                                             <button
-                                                onClick={() => navigate(`/attendance-sheet/${course.id}`)} // Changed from /attendance/ to /attendance-sheet/
+                                                onClick={() => navigate(`/attendance-sheet/${course.id}`)}
                                                 className="btn-secondary"
-                                               
-                                                style={{
-                                                    fontSize: '0.85rem',
-                                                    padding: '5px 10px',
-                                                    backgroundColor: '#17a2b8', // Teal color for attendance
-                                                    flex: 1
-                                                }}
+                                                style={{ flex: 1, backgroundColor: '#17a2b8' }}
                                             >
                                                 📅 Attendance
                                             </button>
                                         </div>
                                     )}
 
-                                    {/* ✅ STUDENT ACTIONS: View Result */}
+                                    {/* STUDENT ACTIONS */}
                                     {user.role === 'Student' && (
-                                        <div className="course-card-actions" onClick={(e) => e.stopPropagation()} style={{ marginTop: '15px' }}>
+                                        <div
+                                            className="course-card-actions"
+                                            onClick={(e) => e.stopPropagation()}
+                                            style={{ marginTop: '15px' }}
+                                        >
                                             <button
                                                 onClick={() => navigate(`/student/result/${course.id}`)}
                                                 className="btn-approve"
                                                 style={{
-                                                    fontSize: '0.85rem',
-                                                    padding: '5px 10px',
                                                     width: '100%',
-                                                    backgroundColor: '#2ecc71', // Green color
+                                                    backgroundColor: '#2ecc71',
                                                     border: 'none',
                                                     color: 'white',
                                                     cursor: 'pointer',
+                                                    padding: '8px',
                                                     borderRadius: '4px'
                                                 }}
                                             >
