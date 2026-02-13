@@ -27,9 +27,10 @@ namespace EduPulse.API.Controllers
         [HttpGet("course/{courseId}")]
         public async Task<IActionResult> GetCourseGradebook(int courseId)
         {
-            // 1. Get Assessments
+            // 1. Get Assessments (Ordered by Date for the Spreadsheet Columns)
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
+                .OrderBy(a => a.Date)
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -46,8 +47,8 @@ namespace EduPulse.API.Controllers
                 .Where(g => assessmentIds.Contains(g.AssessmentId))
                 .ToListAsync();
 
-            // 4. Calculate Attendance Automatically
-            var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == 0); // Assuming 0 is Attendance in your Enum
+            // 4. Inject LIVE Attendance Calculation
+            var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == AssessmentType.Attendance);
 
             if (attendanceAssessment != null)
             {
@@ -55,48 +56,28 @@ namespace EduPulse.API.Controllers
                 {
                     try
                     {
-                        // Calculate stats using the service
                         var summary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, enrollment.StudentId);
-
-                        // Find existing grade in memory (from the list we just fetched)
-                        var studentAttendanceGrade = grades.FirstOrDefault(g =>
+                        var existingGrade = grades.FirstOrDefault(g =>
                             g.AssessmentId == attendanceAssessment.Id &&
                             g.StudentId == enrollment.StudentId);
 
-                        if (studentAttendanceGrade != null)
-                        {
-                            // Update the in-memory value (for display only, not saving to DB here)
-                            studentAttendanceGrade.MarksObtained = summary.GradePoints;
-                        }
+                        if (existingGrade != null)
+                            existingGrade.MarksObtained = summary.GradePoints;
                         else
-                        {
-                            // Add a virtual grade for display
-                            grades.Add(new Grade
-                            {
-                                AssessmentId = attendanceAssessment.Id,
-                                StudentId = enrollment.StudentId,
-                                MarksObtained = summary.GradePoints
-                            });
-                        }
+                            grades.Add(new Grade { AssessmentId = attendanceAssessment.Id, StudentId = enrollment.StudentId, MarksObtained = summary.GradePoints });
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error calculating attendance for student {enrollment.StudentId}: {ex.Message}");
-                        // Continue loop so one failure doesn't break the whole gradebook
-                    }
+                    catch { /* Continue if one student fails */ }
                 }
             }
 
-            // 5. Return JSON
             return Ok(new
             {
                 Assessments = assessments,
                 Grades = grades,
-                // ✅ FIX: Explicitly naming properties so Frontend .map(s => s.name) works
                 Students = enrollments.Select(e => new
                 {
                     StudentId = e.StudentId,
-                    Name = e.Student != null ? e.Student.Name : "Unknown Student"
+                    Name = e.Student != null ? e.Student.Name : "Unknown"
                 })
             });
         }
@@ -111,12 +92,9 @@ namespace EduPulse.API.Controllers
                     .FirstOrDefaultAsync(g => g.AssessmentId == grade.AssessmentId && g.StudentId == grade.StudentId);
 
                 if (existing != null)
-                {
                     existing.MarksObtained = grade.MarksObtained;
-                }
                 else
                 {
-                    // Ensure we are not inserting with ID if it's auto-generated
                     grade.Id = 0;
                     _context.Grades.Add(grade);
                 }
@@ -126,31 +104,25 @@ namespace EduPulse.API.Controllers
             return Ok(new { message = "Grades updated successfully" });
         }
 
-        // --- METHOD 3: STUDENT VIEWS THEIR OWN RESULT (Attendance + Soft Skills) ---
+        // --- METHOD 3: STUDENT VIEWS THEIR OWN RESULT ---
         [HttpGet("student/{courseId}")]
         public async Task<IActionResult> GetMyCourseGrades(int courseId)
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null) return Unauthorized();
+            int studentId = int.Parse(userIdClaim.Value);
 
-            if (!int.TryParse(userIdClaim.Value, out int studentId))
-            {
-                return BadRequest("Invalid User ID in token.");
-            }
-
-            // 1. Get Course Details
             var course = await _context.Courses.FirstOrDefaultAsync(c => c.Id == courseId);
             if (course == null) return NotFound("Course not found");
 
-            // 2. Find Enrollment
             var enrollment = await _context.Enrollments
                 .FirstOrDefaultAsync(e => e.CourseId == courseId && e.StudentId == studentId);
 
-            if (enrollment == null) return NotFound("Student is not enrolled in this course.");
+            if (enrollment == null) return NotFound("Student not enrolled.");
 
-            // 3. Get Assessments and Grades
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
+                .OrderBy(a => a.Date)
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -160,115 +132,97 @@ namespace EduPulse.API.Controllers
                 .AsNoTracking()
                 .ToListAsync();
 
-            // 4. Handle LIVE Attendance Grade
-            var attendanceAssessment = assessments.FirstOrDefault(a => a.Type == 0); // 0 = Attendance
-            if (attendanceAssessment != null)
+            // Inject Live Attendance
+            var attAssessment = assessments.FirstOrDefault(a => a.Type == AssessmentType.Attendance);
+            if (attAssessment != null)
             {
-                try
-                {
-                    var attendanceSummary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
-                    var attendanceGrade = grades.FirstOrDefault(g => g.AssessmentId == attendanceAssessment.Id);
-
-                    if (attendanceGrade != null)
-                    {
-                        attendanceGrade.MarksObtained = attendanceSummary.GradePoints;
-                    }
-                    else
-                    {
-                        grades.Add(new Grade
-                        {
-                            AssessmentId = attendanceAssessment.Id,
-                            StudentId = studentId,
-                            MarksObtained = attendanceSummary.GradePoints
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error calculating student attendance: {ex.Message}");
-                }
+                var summary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
+                var attGrade = grades.FirstOrDefault(g => g.AssessmentId == attAssessment.Id);
+                if (attGrade != null) attGrade.MarksObtained = summary.GradePoints;
+                else grades.Add(new Grade { AssessmentId = attAssessment.Id, StudentId = studentId, MarksObtained = summary.GradePoints });
             }
 
-            // 5. Final Combined Result
             return Ok(new
             {
                 CourseTitle = course.Title,
                 CourseCode = course.Code,
                 Policy = course.GradingPolicy,
-                EnrollmentId = enrollment.Id, // <--- Link for Soft Skills
+                EnrollmentId = enrollment.Id,
                 Assessments = assessments,
                 Grades = grades
             });
         }
 
-        // GET: api/Grades/gap-analysis/{courseId}
-        // GET: api/Grades/gap-analysis/{courseId}
-        // GET: api/Grades/gap-analysis/{courseId}
-        // GET: api/Grades/gap-analysis/{courseId}
+        // --- METHOD 4: PEER GAP ANALYSIS (The Comparison Chart) ---
         [HttpGet("gap-analysis/{courseId}")]
         public async Task<IActionResult> GetGapAnalysis(int courseId)
         {
-            // 1. Get logged-in student ID
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null) return Unauthorized();
             int studentId = int.Parse(userIdClaim.Value);
 
-            // 2. Fetch all assessments for this course
+            // 1. Get assessments in chronological order
             var assessments = await _context.Assessments
                 .Where(a => a.CourseId == courseId)
+                .OrderBy(a => a.Date)
                 .ToListAsync();
 
-            // 3. Fetch all Student IDs enrolled in this course (THIS WAS MISSING IN YOUR CODE)
-            var allStudentIds = await _context.Enrollments
+            var enrollments = await _context.Enrollments
                 .Where(e => e.CourseId == courseId)
-                .Select(e => e.StudentId)
                 .ToListAsync();
 
-            var analysis = new List<GapAnalysisDto>();
+            var result = new List<GapAnalysisDto>();
 
             foreach (var a in assessments)
             {
                 double myMark = 0;
-                double classAvgMark = 0;
+                double classSum = 0;
+                int count = 0;
 
-                if (a.Type == 0) // Attendance Type
+                try
                 {
-                    // Get My Live Attendance
-                    var myAttd = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
-                    myMark = myAttd.GradePoints;
-
-                    // Calculate Class Average Attendance
-                    double totalAttendancePoints = 0;
-                    foreach (var id in allStudentIds)
+                    if (a.Type == AssessmentType.Attendance)
                     {
-                        var summary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, id);
-                        totalAttendancePoints += summary.GradePoints;
+                        // Current User
+                        var myAttd = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
+                        myMark = myAttd.GradePoints;
+
+                        // Class Total
+                        foreach (var e in enrollments)
+                        {
+                            var sum = await _attendanceService.CalculateStudentAttendanceAsync(courseId, e.StudentId);
+                            classSum += sum.GradePoints;
+                            count++;
+                        }
                     }
-                    classAvgMark = allStudentIds.Count > 0 ? totalAttendancePoints / allStudentIds.Count : 0;
-                }
-                else // Quiz / Exam Type
-                {
-                    // Get My Mark
-                    myMark = await _context.Grades
-                        .Where(g => g.AssessmentId == a.Id && g.StudentId == studentId)
-                        .Select(g => (double?)g.MarksObtained).FirstOrDefaultAsync() ?? 0;
+                    else
+                    {
+                        // Current User
+                        myMark = await _context.Grades
+                            .Where(g => g.AssessmentId == a.Id && g.StudentId == studentId)
+                            .Select(g => g.MarksObtained).FirstOrDefaultAsync();
 
-                    // Get Class Average Mark
-                    // Get Class Average Mark
-                    classAvgMark = await _context.Grades
-                        .Where(g => g.AssessmentId == a.Id)
-                        .AverageAsync(g => (double?)g.MarksObtained) ?? 0;
-                }
+                        // Class Total
+                        var allGrades = await _context.Grades
+                            .Where(g => g.AssessmentId == a.Id)
+                            .Select(g => g.MarksObtained).ToListAsync();
 
-                analysis.Add(new GapAnalysisDto
-                {
-                    AssessmentTitle = a.Title,
-                    MyPercentage = a.MaxMarks > 0 ? (myMark / (double)a.MaxMarks) * 100 : 0,
-                    ClassAveragePercentage = a.MaxMarks > 0 ? (classAvgMark / (double)a.MaxMarks) * 100 : 0
-                });
+                        classSum = allGrades.Sum();
+                        count = allGrades.Count;
+                    }
+
+                    result.Add(new GapAnalysisDto
+                    {
+                        AssessmentTitle = a.Title,
+                        MyPercentage = a.MaxMarks > 0 ? Math.Round((myMark / a.MaxMarks) * 100, 1) : 0,
+                        ClassAveragePercentage = (a.MaxMarks > 0 && count > 0)
+                            ? Math.Round(((classSum / count) / a.MaxMarks) * 100, 1) : 0
+                    });
+                }
+                catch { /* Skip errors for single assessment to prevent breaking chart */ }
             }
 
-            return Ok(analysis);
+            return Ok(result);
         }
     }
 }

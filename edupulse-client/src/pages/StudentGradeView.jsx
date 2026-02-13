@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import AcademicPerformanceTab from '../components/AcademicPerformanceTab';
+
 import {
     Chart as ChartJS,
     RadialLinearScale,
@@ -19,77 +22,104 @@ ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, 
 
 const StudentGradeView = () => {
     const { courseId } = useParams();
+    const { user } = useContext(AuthContext);
     const navigate = useNavigate();
 
+    // State
     const [data, setData] = useState({ courseTitle: '', courseCode: '', policy: '', assessments: [], grades: [], enrollmentId: null });
     const [softSkills, setSoftSkills] = useState(null);
     const [gapAnalysis, setGapAnalysis] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // API Base URL
     const API_BASE = "https://localhost:7096/api";
 
     useEffect(() => {
         const fetchAllData = async () => {
             const token = localStorage.getItem('token');
+            if (!token) return;
+
+            // Wait until user context is loaded
+            if (!user || !user.id) return;
+
             const config = { headers: { Authorization: `Bearer ${token}` } };
+
+            // =================================================================
+            // 1. Fetch Gap Analysis (Graph) - INDEPENDENT CALL
+            // =================================================================
             try {
-                // 1. Fetch Grades
+                const gapRes = await axios.get(`${API_BASE}/Grades/gap-analysis/${courseId}`, config);
+                setGapAnalysis(gapRes.data || []);
+            } catch (error) {
+                console.error("Error fetching gap analysis:", error);
+                setGapAnalysis([]);
+            }
+
+            // =================================================================
+            // 2. Fetch Grades (Table Data)
+            // =================================================================
+            try {
                 const res = await axios.get(`${API_BASE}/Grades/student/${courseId}`, config);
                 setData(res.data);
-
-                // 2. Fetch Soft Skills
-                if (res.data.enrollmentId) {
-                    const skillRes = await axios.get(`${API_BASE}/SoftSkills/enrollment/${res.data.enrollmentId}`, config);
-                    setSoftSkills(skillRes.data);
-                }
-
-                // 3. Fetch Gap Analysis
-                const gapRes = await axios.get(`${API_BASE}/Grades/gap-analysis/${courseId}`, config);
-                setGapAnalysis(gapRes.data);
-
             } catch (error) {
-                console.error("Error fetching data:", error);
+                console.error("Error fetching grades:", error);
+            }
+
+            // =================================================================
+            // 3. Fetch Soft Skills (Radar Chart) - FIXED
+            // We use user.id + courseId to avoid the "1:1" enrollmentId bug
+            // =================================================================
+            try {
+                const skillRes = await axios.get(`${API_BASE}/SoftSkills/enrollment/${user.id}/${courseId}`, config);
+                setSoftSkills(skillRes.data);
+            } catch (skillError) {
+                // ✅ FIXED: We now use 'skillError' in the console log to satisfy the linter
+                console.warn("Soft skills info not found (normal if not rated yet).", skillError);
+                setSoftSkills({ discipline: 0, participation: 0, collaboration: 0 });
             } finally {
                 setLoading(false);
             }
         };
-        fetchAllData();
-    }, [courseId]);
 
-    // --- GAP ANALYSIS CHART DATA (Straight lines for accuracy) ---
+        fetchAllData();
+    }, [courseId, user]);
+
+    // --- GAP ANALYSIS CHART DATA ---
     const gapChartData = {
-        labels: gapAnalysis.map(a => a.assessmentTitle),
+        labels: gapAnalysis?.map(a => a.assessmentTitle) || [],
         datasets: [
             {
                 label: 'My Score (%)',
-                data: gapAnalysis.map(a => a.myPercentage),
+                data: gapAnalysis?.map(a => a.myPercentage) || [],
                 borderColor: '#4a90e2',
                 backgroundColor: '#4a90e2',
-                tension: 0, // FIXED: Set to 0 to prevent curving above 100%
+                tension: 0,
                 borderWidth: 4,
                 pointRadius: 6,
-                pointHoverRadius: 8
             },
             {
                 label: 'Class Average (%)',
-                data: gapAnalysis.map(a => a.classAveragePercentage),
+                data: gapAnalysis?.map(a => a.classAveragePercentage) || [],
                 borderColor: '#e74c3c',
                 backgroundColor: '#e74c3c',
                 borderDash: [5, 5],
-                tension: 0, // FIXED: Set to 0 to prevent curving above 100%
+                tension: 0,
                 borderWidth: 4,
                 pointRadius: 6,
-                pointHoverRadius: 8
             }
         ]
     };
 
-    // --- Radar Chart Data ---
+    // --- RADAR CHART DATA (Soft Skills) ---
     const radarData = {
         labels: ['Discipline', 'Participation', 'Collaboration'],
         datasets: [{
             label: 'Behavioral Rating (1-5)',
-            data: [softSkills?.discipline || 0, softSkills?.participation || 0, softSkills?.collaboration || 0],
+            data: [
+                softSkills?.discipline || 0,
+                softSkills?.participation || 0,
+                softSkills?.collaboration || 0
+            ],
             backgroundColor: 'rgba(54, 162, 235, 0.2)',
             borderColor: 'rgba(54, 162, 235, 1)',
             borderWidth: 2,
@@ -100,17 +130,27 @@ const StudentGradeView = () => {
 
     return (
         <div className="dashboard-container">
+            {/* Header */}
             <div className="header-strip">
                 <button onClick={() => navigate(-1)} className="btn-action">← Back</button>
                 <div style={{ textAlign: 'right' }}>
                     <h2 style={{ margin: 0 }}>Course No: {data.courseCode}</h2>
-                    <p style={{ margin: 0, fontWeight: '500', color: '#666' }}>Course Name: {data.courseTitle}</p>
+                    <p style={{ margin: 0, fontWeight: '500', color: '#666' }}>Academic Dashboard</p>
                 </div>
             </div>
 
-            {/* GAP ANALYSIS SECTION */}
+            {/* ✅ ACADEMIC HEALTH & CORRELATION GRAPH */}
+            <div style={{ marginTop: '20px' }}>
+                <AcademicPerformanceTab
+                    key={`${user?.id}-${courseId}`}
+                    studentId={user?.id}
+                    courseId={courseId}
+                />
+            </div>
+
+            {/* GAP ANALYSIS SECTION (The Graph) */}
             <div className="user-info-card" style={{ marginTop: '20px', border: '1px solid #4a90e2' }}>
-                <h3 style={{ color: '#4a90e2', marginBottom: '15px' }}>📊 Gap Analysis: My Performance vs. Class Average</h3>
+                <h3 style={{ color: '#4a90e2', marginBottom: '15px' }}>📊 Peer Comparison: My Performance vs. Class Average</h3>
                 <div style={{ height: '350px' }}>
                     <Line
                         data={gapChartData}
@@ -119,17 +159,11 @@ const StudentGradeView = () => {
                             scales: {
                                 y: {
                                     min: 0,
-                                    max: 110, // Keep at 110 so the 100% dots are not cut off
+                                    max: 110,
                                     ticks: {
                                         stepSize: 20,
                                         callback: (value) => value <= 100 ? value + '%' : ''
                                     }
-                                }
-                            },
-                            plugins: {
-                                legend: {
-                                    display: true,
-                                    position: 'top',
                                 }
                             }
                         }}
@@ -137,7 +171,9 @@ const StudentGradeView = () => {
                 </div>
             </div>
 
-            <div className="user-info-card" style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
+            {/* LOWER SECTION: Table & Soft Skills */}
+            <div className="user-info-card" style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', marginBottom: '40px' }}>
+
                 {/* Assessment Table */}
                 <div>
                     <h4>Assessment Breakdown</h4>
@@ -161,7 +197,7 @@ const StudentGradeView = () => {
 
                 {/* Soft Skills Radar */}
                 <div style={{ textAlign: 'center', borderLeft: '1px solid #eee' }}>
-                    <h4>Behavioral Evaluation</h4>
+                    <h4>Current Behavioral Snapshot</h4>
                     <div style={{ width: '280px', margin: '0 auto' }}>
                         <Radar
                             data={radarData}
@@ -176,9 +212,6 @@ const StudentGradeView = () => {
                             }}
                         />
                     </div>
-                    <p style={{ fontSize: '0.8rem', color: '#777', marginTop: '10px' }}>
-                        Ratings provided by Course Teacher
-                    </p>
                 </div>
             </div>
         </div>

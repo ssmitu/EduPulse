@@ -18,37 +18,43 @@ namespace EduPulse.API.Services
             _context = context;
         }
 
+        // ============================
+        // MARK ATTENDANCE
+        // ============================
         public async Task MarkAttendanceAsync(MarkAttendanceRequest request)
         {
             foreach (var item in request.Students)
             {
-                var existingRecord = await _context.Attendances
-                    .FirstOrDefaultAsync(a => a.CourseId == request.CourseId &&
-                                              a.StudentId == item.StudentId &&
-                                              a.Date.Date == request.Date.Date);
+                var existing = await _context.Attendances.FirstOrDefaultAsync(a =>
+                    a.CourseId == request.CourseId &&
+                    a.StudentId == item.StudentId &&
+                    a.Date.Date == request.Date.Date);
 
-                if (existingRecord != null)
+                if (existing != null)
                 {
-                    existingRecord.IsPresent = item.IsPresent;
+                    existing.IsPresent = item.IsPresent;
                 }
                 else
                 {
-                    var newRecord = new Attendance
+                    _context.Attendances.Add(new Attendance
                     {
                         CourseId = request.CourseId,
                         StudentId = item.StudentId,
                         Date = request.Date,
                         IsPresent = item.IsPresent
-                    };
-                    _context.Attendances.Add(newRecord);
+                    });
                 }
             }
+
             await _context.SaveChangesAsync();
         }
 
+        // ============================
+        // ATTENDANCE CALCULATION (OUT OF 10)
+        // ============================
         public async Task<AttendanceSummaryDto> CalculateStudentAttendanceAsync(int courseId, int studentId)
         {
-            var records = await _context.Attendances
+            var studentRecords = await _context.Attendances
                 .Where(a => a.CourseId == courseId && a.StudentId == studentId)
                 .ToListAsync();
 
@@ -59,28 +65,40 @@ namespace EduPulse.API.Services
                 .CountAsync();
 
             if (totalClasses == 0)
-                return new AttendanceSummaryDto { TotalClasses = 0, AttendedClasses = 0, Percentage = 0, GradePoints = 0 };
+            {
+                return new AttendanceSummaryDto
+                {
+                    TotalClasses = 0,
+                    AttendedClasses = 0,
+                    Percentage = 0,
+                    GradePoints = 0
+                };
+            }
 
-            var attendedCount = records.Count(a => a.IsPresent);
-            double percentage = ((double)attendedCount / totalClasses) * 100;
+            int attended = studentRecords.Count(a => a.IsPresent);
 
-            int score = 0;
-            if (percentage >= 100) score = 10;
-            else if (percentage >= 90) score = 9;
-            else if (percentage >= 80) score = 8;
-            else if (percentage >= 70) score = 7;
-            else if (percentage >= 60) score = 6;
-            else score = 5;
+            double percentage = ((double)attended / totalClasses) * 100;
+
+            // ✅ REAL attendance marks out of 10
+            double attendanceMarks = (percentage / 100.0) * 10.0;
 
             return new AttendanceSummaryDto
             {
                 TotalClasses = totalClasses,
-                AttendedClasses = attendedCount,
+                AttendedClasses = attended,
                 Percentage = Math.Round(percentage, 2),
-                GradePoints = score
+
+                // If GradePoints is INT in DTO:
+                GradePoints = (int)Math.Round(attendanceMarks)
+
+                // 👉 If you later change DTO to double:
+                // GradePoints = Math.Round(attendanceMarks, 2)
             };
         }
 
+        // ============================
+        // COURSE HISTORY
+        // ============================
         public async Task<List<Attendance>> GetCourseAttendanceHistoryAsync(int courseId)
         {
             return await _context.Attendances
@@ -89,7 +107,9 @@ namespace EduPulse.API.Services
                 .ToListAsync();
         }
 
-        // ✅ ADD THESE TWO METHODS TO FIX THE INTERFACE ERROR
+        // ============================
+        // GET BY DATE
+        // ============================
         public async Task<List<Attendance>> GetAttendanceByDateAsync(int courseId, DateTime date)
         {
             return await _context.Attendances
@@ -97,6 +117,9 @@ namespace EduPulse.API.Services
                 .ToListAsync();
         }
 
+        // ============================
+        // DELETE BY DATE
+        // ============================
         public async Task DeleteAttendanceByDateAsync(int courseId, DateTime date)
         {
             var records = _context.Attendances

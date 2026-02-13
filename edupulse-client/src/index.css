@@ -551,3 +551,65 @@ body {
     color: #64748b;
     font-style: italic;
 }
+
+/* --- Academic Health Bar Styles --- */
+
+.health-bar-wrapper {
+    @apply mb-8 p-4 bg-gray-50 rounded-xl border border-gray-100;
+}
+
+.health-bar-container {
+    @apply w-full bg-gray-200 rounded-full h-6 overflow-hidden shadow-inner relative;
+}
+
+.health-bar-fill {
+    @apply h-full rounded-full transition-all duration-1000 ease-out;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Status Colors */
+
+.status-on-track {
+    background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.status-needs-improvement {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.status-at-risk {
+    background: linear-gradient(90deg, #ef4444, #f87171);
+    animation: pulse-red 2s infinite;
+}
+
+.status-text {
+    @apply font-bold text-sm uppercase tracking-wider;
+}
+
+    .status-text.on-track {
+        @apply text-green-600;
+    }
+
+    .status-text.needs-improvement {
+        @apply text-amber-600;
+    }
+
+    .status-text.at-risk {
+        @apply text-red-600;
+    }
+
+/* Pulse animation */
+
+@keyframes pulse-red {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.8;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
