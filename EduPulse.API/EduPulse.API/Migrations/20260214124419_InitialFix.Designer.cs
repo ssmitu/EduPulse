@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EduPulse.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260204063600_AddGradebookTables")]
-    partial class AddGradebookTables
+    [Migration("20260214124419_InitialFix")]
+    partial class InitialFix
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -36,6 +36,9 @@ namespace EduPulse.API.Migrations
                     b.Property<int>("CourseId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
                     b.Property<double>("MaxMarks")
                         .HasColumnType("float");
 
@@ -56,6 +59,36 @@ namespace EduPulse.API.Migrations
                     b.ToTable("Assessments");
                 });
 
+            modelBuilder.Entity("EduPulse.API.Models.Attendance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsPresent")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("CourseId", "StudentId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("Attendances");
+                });
+
             modelBuilder.Entity("EduPulse.API.Models.Course", b =>
                 {
                     b.Property<int>("Id")
@@ -68,13 +101,20 @@ namespace EduPulse.API.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("GradingPolicy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
+
                     b.Property<int>("TargetDeptId")
                         .HasColumnType("int");
 
                     b.Property<int>("TargetSemester")
                         .HasColumnType("int");
 
-                    b.Property<int>("TeacherId")
+                    b.Property<int?>("TeacherId")
                         .HasColumnType("int");
 
                     b.Property<string>("Title")
@@ -147,6 +187,32 @@ namespace EduPulse.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Departments");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "CSE",
+                            TeacherVerificationKey = "CSE-KEY"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "EEE",
+                            TeacherVerificationKey = "EEE-KEY"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "BBA",
+                            TeacherVerificationKey = "BBA-KEY"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "English",
+                            TeacherVerificationKey = "ENG-KEY"
+                        });
                 });
 
             modelBuilder.Entity("EduPulse.API.Models.Enrollment", b =>
@@ -208,6 +274,36 @@ namespace EduPulse.API.Migrations
                     b.ToTable("Grades");
                 });
 
+            modelBuilder.Entity("EduPulse.API.Models.SoftSkill", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Collaboration")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Discipline")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EnrollmentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("LastUpdated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Participation")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EnrollmentId");
+
+                    b.ToTable("SoftSkills");
+                });
+
             modelBuilder.Entity("EduPulse.API.Models.User", b =>
                 {
                     b.Property<int>("Id")
@@ -250,12 +346,31 @@ namespace EduPulse.API.Migrations
             modelBuilder.Entity("EduPulse.API.Models.Assessment", b =>
                 {
                     b.HasOne("EduPulse.API.Models.Course", "Course")
-                        .WithMany()
+                        .WithMany("Assessments")
                         .HasForeignKey("CourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Course");
+                });
+
+            modelBuilder.Entity("EduPulse.API.Models.Attendance", b =>
+                {
+                    b.HasOne("EduPulse.API.Models.Course", "Course")
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EduPulse.API.Models.User", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("EduPulse.API.Models.Course", b =>
@@ -268,9 +383,7 @@ namespace EduPulse.API.Migrations
 
                     b.HasOne("EduPulse.API.Models.User", "Teacher")
                         .WithMany()
-                        .HasForeignKey("TeacherId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("TeacherId");
 
                     b.Navigation("TargetDept");
 
@@ -326,6 +439,17 @@ namespace EduPulse.API.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("EduPulse.API.Models.SoftSkill", b =>
+                {
+                    b.HasOne("EduPulse.API.Models.Enrollment", "Enrollment")
+                        .WithMany()
+                        .HasForeignKey("EnrollmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Enrollment");
+                });
+
             modelBuilder.Entity("EduPulse.API.Models.User", b =>
                 {
                     b.HasOne("EduPulse.API.Models.Department", "Department")
@@ -344,6 +468,8 @@ namespace EduPulse.API.Migrations
 
             modelBuilder.Entity("EduPulse.API.Models.Course", b =>
                 {
+                    b.Navigation("Assessments");
+
                     b.Navigation("Enrollments");
                 });
 

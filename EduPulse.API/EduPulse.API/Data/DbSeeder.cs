@@ -1,7 +1,7 @@
 ﻿using EduPulse.API.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace EduPulse.API.Data
@@ -10,13 +10,11 @@ namespace EduPulse.API.Data
     {
         public static void Seed(ApplicationDbContext context, IConfiguration configuration)
         {
-            // 1. Seed Department
-            if (!context.Departments.Any())
-            {
-                context.Departments.Add(new Department { Name = "CSE", TeacherVerificationKey = "CSE123" });
-                context.SaveChanges();
-            }
-            var dept = context.Departments.First();
+            // 1. SAFE LOOKUP: Don't create departments here. Use the ones from DbContext.HasData
+            var dept = context.Departments.FirstOrDefault(d => d.Name == "CSE");
+
+            // If database is empty or migration didn't run, we stop to prevent crash
+            if (dept == null) return;
 
             // 2. Seed Student
             if (!context.Users.Any(u => u.Role == UserRole.Student))
@@ -25,32 +23,40 @@ namespace EduPulse.API.Data
                 {
                     Name = "John Student",
                     Email = "student@test.com",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("pass123"),
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("pass123"), // Ensure you have BCrypt installed
                     Role = UserRole.Student,
                     IsVerified = true,
                     DepartmentId = dept.Id
                 });
                 context.SaveChanges();
             }
-            var student = context.Users.First(u => u.Role == UserRole.Student);
+
+            var student = context.Users.FirstOrDefault(u => u.Role == UserRole.Student);
+            if (student == null) return;
 
             // 3. Seed Course & Enrollment
-            if (!context.Courses.Any())
+            // Check by Title to prevent duplicates
+            var course = context.Courses.FirstOrDefault(c => c.Title == "Programming 101");
+            if (course == null)
             {
-                var course = new Course { Title = "Programming 101" };
+                course = new Course { Title = "Programming 101" };
                 context.Courses.Add(course);
                 context.SaveChanges();
+            }
 
-                context.Enrollments.Add(new Enrollment { CourseId = course.Id, StudentId = student.Id });
+            var enrollment = context.Enrollments.FirstOrDefault(e => e.CourseId == course.Id && e.StudentId == student.Id);
+            if (enrollment == null)
+            {
+                enrollment = new Enrollment { CourseId = course.Id, StudentId = student.Id };
+                context.Enrollments.Add(enrollment);
                 context.SaveChanges();
             }
-            var enrollment = context.Enrollments.First();
 
-            // 4. Seed Assessments & Grades (Independent Time Stream)
-            if (!context.Assessments.Any())
+            // 4. Seed Assessments & Grades
+            if (!context.Assessments.Any(a => a.CourseId == course.Id))
             {
-                var q1 = new Assessment { Title = "Quiz 1", Date = DateTime.Now.AddDays(-30), MaxMarks = 20, CourseId = enrollment.CourseId };
-                var q2 = new Assessment { Title = "Midterm", Date = DateTime.Now.AddDays(-10), MaxMarks = 50, CourseId = enrollment.CourseId };
+                var q1 = new Assessment { Title = "Quiz 1", Date = DateTime.Now.AddDays(-30), MaxMarks = 20, CourseId = course.Id };
+                var q2 = new Assessment { Title = "Midterm", Date = DateTime.Now.AddDays(-10), MaxMarks = 50, CourseId = course.Id };
 
                 context.Assessments.AddRange(q1, q2);
                 context.SaveChanges();
@@ -62,15 +68,12 @@ namespace EduPulse.API.Data
                 context.SaveChanges();
             }
 
-            // 5. Seed Soft Skills (Independent Time Stream - Different Dates!)
-            if (!context.SoftSkills.Any())
+            // 5. Seed Soft Skills
+            if (!context.SoftSkills.Any(s => s.EnrollmentId == enrollment.Id))
             {
                 context.SoftSkills.AddRange(
-                    // Rating recorded AFTER Quiz 1
                     new SoftSkill { EnrollmentId = enrollment.Id, Discipline = 5, Participation = 5, Collaboration = 5, LastUpdated = DateTime.Now.AddDays(-25) },
-                    // Rating recorded BEFORE Midterm
                     new SoftSkill { EnrollmentId = enrollment.Id, Discipline = 2, Participation = 3, Collaboration = 2, LastUpdated = DateTime.Now.AddDays(-15) },
-                    // Recent rating
                     new SoftSkill { EnrollmentId = enrollment.Id, Discipline = 5, Participation = 4, Collaboration = 5, LastUpdated = DateTime.Now.AddDays(-2) }
                 );
                 context.SaveChanges();

@@ -39,19 +39,30 @@ const Gradebook = () => {
             try {
                 const res = await axios.get(`${API_BASE}/Grades/course/${courseId}`, config);
 
+                // Normalizing Data to prevent Case-Sensitivity issues
                 const rawStudents = res.data.students || res.data.Students || [];
                 const rawAssessments = res.data.assessments || res.data.Assessments || [];
                 const rawGrades = res.data.grades || res.data.Grades || [];
                 const rawPolicy = res.data.policy || res.data.Policy || 'Best 2 of 3 Quizzes';
 
                 setData({
-                    assessments: rawAssessments,
-                    grades: rawGrades,
+                    policy: rawPolicy,
+                    assessments: rawAssessments.map(a => ({
+                        id: a.id || a.Id,
+                        title: a.title || a.Title,
+                        type: a.type || a.Type,
+                        maxMarks: a.maxMarks || a.MaxMarks
+                    })),
+                    grades: rawGrades.map(g => ({
+                        id: g.id || g.Id,
+                        assessmentId: g.assessmentId || g.AssessmentId,
+                        studentId: g.studentId || g.StudentId,
+                        marksObtained: g.marksObtained ?? g.MarksObtained
+                    })),
                     enrollments: rawStudents.map(s => ({
                         studentId: s.studentId || s.StudentId,
                         student: { name: s.name || s.Name || "Unknown" }
-                    })),
-                    policy: rawPolicy
+                    }))
                 });
             } catch (error) {
                 console.error("Fetch error:", error);
@@ -68,7 +79,6 @@ const Gradebook = () => {
         const config = { headers: { Authorization: `Bearer ${token}` } };
 
         try {
-            // Fetch the latest entry so the teacher doesn't start from scratch
             const res = await axios.get(`${API_BASE}/SoftSkills/enrollment/${enrollment.studentId}/${courseId}`, config);
             if (res.data) {
                 setSoftSkills({
@@ -78,7 +88,7 @@ const Gradebook = () => {
                 });
             }
         } catch (error) {
-            console.error("Fetch skills error:", error); // Use the variable here
+            // If not found, reset to defaults
             setSoftSkills({ discipline: 3, participation: 3, collaboration: 3 });
         }
     };
@@ -98,7 +108,7 @@ const Gradebook = () => {
             alert(`Weekly behavior recorded for ${selectedEnrollment.student.name}`);
             setSelectedEnrollment(null);
         } catch (error) {
-            console.error("Save skills error:", error); // Use the variable here
+            console.error("Save skills error:", error);
             alert("Error saving soft skills.");
         }
     };
@@ -136,7 +146,7 @@ const Gradebook = () => {
             await axios.post(`${API_BASE}/Assessments`,
                 {
                     ...newCol,
-                    date: new Date().toISOString(), // FIXED: Prevents 1/1/1 bug
+                    date: new Date().toISOString(),
                     weightage: 0,
                     courseId: parseInt(courseId)
                 },
@@ -166,46 +176,52 @@ const Gradebook = () => {
         }
     };
 
-    // --- CALCULATION LOGIC (Best X of Y) ---
+    // --- CALCULATION LOGIC (FIXED) ---
     const calculateStats = (studentId) => {
-        const studentGrades = (data.grades || []).filter(g => (g.studentId || g.StudentId) === studentId);
-        const assessments = data.assessments || [];
+        // Use loose equality (==) for IDs to handle string/number mismatch
+        const studentGrades = data.grades.filter(g => g.studentId == studentId);
 
-        // 1. Quizzes
-        const quizAssessments = assessments.filter(a => (a.type === 1 || a.Type === 1));
+        // 1. Quizzes (Type 1)
+        const quizAssessments = data.assessments.filter(a => a.type == 1);
         let quizScore = 0;
         if (quizAssessments.length > 0) {
             const scores = quizAssessments.map(a => {
-                const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (a.id || a.Id));
-                return g ? (g.marksObtained || g.MarksObtained || 0) : 0;
+                const g = studentGrades.find(gr => gr.assessmentId == a.id);
+                return g ? parseFloat(g.marksObtained || 0) : 0;
             });
-            scores.sort((a, b) => b - a);
+            scores.sort((a, b) => b - a); // Sort Descending
+
             const pickCount = data.policy.includes('Best 3') ? 3 : 2;
             const actualToPick = Math.min(scores.length, pickCount);
-            quizScore = scores.slice(0, actualToPick).reduce((a, b) => a + b, 0) / (actualToPick || 1);
+
+            const sumBest = scores.slice(0, actualToPick).reduce((a, b) => a + b, 0);
+            quizScore = actualToPick > 0 ? sumBest / actualToPick : 0;
         }
 
-        // 2. Attendance
-        const attdAss = assessments.find(a => (a.type === 0 || a.Type === 0));
+        // 2. Attendance (Type 0)
+        // Robust check: Look for Type 0 OR Title containing "Attendance"
+        const attdAss = data.assessments.find(a => a.type == 0 || (a.title && a.title.toLowerCase().includes('attendance')));
         let attdScore = 0;
         if (attdAss) {
-            const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (attdAss.id || attdAss.Id));
-            attdScore = g ? (g.marksObtained || g.MarksObtained || 0) : 0;
+            const g = studentGrades.find(gr => gr.assessmentId == attdAss.id);
+            attdScore = g ? parseFloat(g.marksObtained || 0) : 0;
         }
 
-        // 3. Final
-        const finalAss = assessments.find(a => (a.type === 3 || a.Type === 3));
+        // 3. Final (Type 3)
+        const finalAss = data.assessments.find(a => a.type == 3);
         let finalScore = 0;
         if (finalAss) {
-            const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (finalAss.id || finalAss.Id));
-            finalScore = g ? (g.marksObtained || g.MarksObtained || 0) : 0;
+            const g = studentGrades.find(gr => gr.assessmentId == finalAss.id);
+            finalScore = g ? parseFloat(g.marksObtained || 0) : 0;
         }
+
+        const total = Math.min(quizScore + attdScore + finalScore, 100);
 
         return {
             attendance: attdScore.toFixed(2),
             quizzes: quizScore.toFixed(2),
             final: finalScore.toFixed(2),
-            total: Math.min(quizScore + attdScore + finalScore, 100).toFixed(2)
+            total: total.toFixed(2)
         };
     };
 
@@ -235,12 +251,12 @@ const Gradebook = () => {
                         <thead>
                             <tr>
                                 <th>Student Name</th>
-                                {(data.assessments || []).map(a => (
-                                    <th key={a.id || a.Id}>
+                                {data.assessments.map(a => (
+                                    <th key={a.id}>
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            {a.title || a.Title}
+                                            {a.title}
                                             <button
-                                                onClick={() => handleDeleteColumn(a.id || a.Id)}
+                                                onClick={() => handleDeleteColumn(a.id)}
                                                 style={{ border: 'none', background: 'none', cursor: 'pointer', marginLeft: 8 }}
                                                 title="Delete column"
                                             >
@@ -252,14 +268,15 @@ const Gradebook = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {(data.enrollments || []).map(e => (
+                            {data.enrollments.map(e => (
                                 <tr key={e.studentId}>
                                     <td>{e.student?.name}</td>
-                                    {(data.assessments || []).map(a => {
-                                        const g = (data.grades || []).find(gr => (gr.assessmentId || gr.AssessmentId) === (a.id || a.Id) && (gr.studentId || gr.StudentId) === e.studentId);
-                                        const isAuto = (a.type === 0 || a.Type === 0);
+                                    {data.assessments.map(a => {
+                                        // Use strict or loose equality here consistently
+                                        const g = data.grades.find(gr => gr.assessmentId == a.id && gr.studentId == e.studentId);
+                                        const isAuto = (a.type == 0);
                                         return (
-                                            <td key={a.id || a.Id}>
+                                            <td key={a.id}>
                                                 <input
                                                     type="number"
                                                     className="form-input"
@@ -269,8 +286,9 @@ const Gradebook = () => {
                                                         backgroundColor: isAuto ? '#f8f9fa' : 'white'
                                                     }}
                                                     readOnly={isAuto}
-                                                    defaultValue={g ? (g.marksObtained || g.MarksObtained) : ''}
-                                                    onBlur={ev => isAuto ? null : updateMark(e.studentId, (a.id || a.Id), ev.target.value)}
+                                                    key={g ? g.marksObtained : 'empty'}
+                                                    defaultValue={g ? g.marksObtained : ''}
+                                                    onBlur={ev => isAuto ? null : updateMark(e.studentId, a.id, ev.target.value)}
                                                 />
                                             </td>
                                         );
@@ -298,7 +316,7 @@ const Gradebook = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {(data.enrollments || []).map(e => {
+                        {data.enrollments.map(e => {
                             const stats = calculateStats(e.studentId);
                             return (
                                 <tr key={e.studentId}>
