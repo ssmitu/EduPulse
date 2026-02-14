@@ -184,6 +184,32 @@ namespace EduPulse.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Departments");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "CSE",
+                            TeacherVerificationKey = "CSE-KEY"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "EEE",
+                            TeacherVerificationKey = "EEE-KEY"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "BBA",
+                            TeacherVerificationKey = "BBA-KEY"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "English",
+                            TeacherVerificationKey = "ENG-KEY"
+                        });
                 });
 
             modelBuilder.Entity("EduPulse.API.Models.Enrollment", b =>
