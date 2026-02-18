@@ -19,20 +19,33 @@ namespace EduPulse.API.Services
         }
 
         // ============================
-        // MARK ATTENDANCE
+        // MARK ATTENDANCE (Modified for Daily Pulse)
         // ============================
         public async Task MarkAttendanceAsync(MarkAttendanceRequest request)
         {
-            foreach (var item in request.Students)
+            // 1. Pre-fetch enrollments for this course to link SoftSkills later
+            var courseEnrollments = await _context.Enrollments
+                .Where(e => e.CourseId == request.CourseId)
+                .ToListAsync();
+
+            // 2. Pre-fetch existing SoftSkills for this date to avoid duplicates/overwriting
+            // ✅ FIX: Added 's.Enrollment != null' to satisfy compiler warning
+            var existingSoftSkills = await _context.SoftSkills
+                .Include(s => s.Enrollment)
+                .Where(s => s.Enrollment != null && s.Enrollment.CourseId == request.CourseId && s.Date.Date == request.Date.Date)
+                .ToListAsync();
+
+            foreach (var item in request.Students) // item has StudentId and IsPresent
             {
-                var existing = await _context.Attendances.FirstOrDefaultAsync(a =>
+                // --- Part A: Handle Attendance Record ---
+                var existingAttendance = await _context.Attendances.FirstOrDefaultAsync(a =>
                     a.CourseId == request.CourseId &&
                     a.StudentId == item.StudentId &&
                     a.Date.Date == request.Date.Date);
 
-                if (existing != null)
+                if (existingAttendance != null)
                 {
-                    existing.IsPresent = item.IsPresent;
+                    existingAttendance.IsPresent = item.IsPresent;
                 }
                 else
                 {
@@ -43,6 +56,36 @@ namespace EduPulse.API.Services
                         Date = request.Date,
                         IsPresent = item.IsPresent
                     });
+                }
+
+                // --- Part B: The "Daily Pulse" Sync Logic ---
+                // Only generate Soft Skills if the student is PRESENT
+                if (item.IsPresent)
+                {
+                    // Find the enrollment for this student
+                    var enrollment = courseEnrollments.FirstOrDefault(e => e.StudentId == item.StudentId);
+
+                    if (enrollment != null)
+                    {
+                        // Check if a Soft Skill record already exists for this Enrollment + Date
+                        bool skillAlreadyExists = existingSoftSkills.Any(s => s.EnrollmentId == enrollment.Id);
+
+                        // If NOT exists, create the default record
+                        if (!skillAlreadyExists)
+                        {
+                            var newSoftSkill = new SoftSkill
+                            {
+                                EnrollmentId = enrollment.Id,
+                                Date = request.Date, // Use the attendance date
+                                Discipline = 4,      // Default Rating
+                                Participation = 4,   // Default Rating
+                                Collaboration = 4,   // Default Rating
+                                LastUpdated = DateTime.Now
+                            };
+
+                            _context.SoftSkills.Add(newSoftSkill);
+                        }
+                    }
                 }
             }
 
@@ -76,10 +119,7 @@ namespace EduPulse.API.Services
             }
 
             int attended = studentRecords.Count(a => a.IsPresent);
-
             double percentage = ((double)attended / totalClasses) * 100;
-
-            // ✅ REAL attendance marks out of 10
             double attendanceMarks = (percentage / 100.0) * 10.0;
 
             return new AttendanceSummaryDto
@@ -87,12 +127,7 @@ namespace EduPulse.API.Services
                 TotalClasses = totalClasses,
                 AttendedClasses = attended,
                 Percentage = Math.Round(percentage, 2),
-
-                // If GradePoints is INT in DTO:
                 GradePoints = (int)Math.Round(attendanceMarks)
-
-                // 👉 If you later change DTO to double:
-                // GradePoints = Math.Round(attendanceMarks, 2)
             };
         }
 
@@ -122,10 +157,18 @@ namespace EduPulse.API.Services
         // ============================
         public async Task DeleteAttendanceByDateAsync(int courseId, DateTime date)
         {
-            var records = _context.Attendances
+            // 1. Find Attendance Records
+            var attendanceRecords = _context.Attendances
                 .Where(a => a.CourseId == courseId && a.Date.Date == date.Date);
 
-            _context.Attendances.RemoveRange(records);
+            // 2. Find Soft Skill Records for this Date & Course (via Enrollment)
+            // ✅ FIX: Added 's.Enrollment != null' to satisfy compiler warning
+            var softSkillRecords = _context.SoftSkills
+                .Where(s => s.Enrollment != null && s.Enrollment.CourseId == courseId && s.Date.Date == date.Date);
+
+            _context.Attendances.RemoveRange(attendanceRecords);
+            _context.SoftSkills.RemoveRange(softSkillRecords);
+
             await _context.SaveChangesAsync();
         }
     }

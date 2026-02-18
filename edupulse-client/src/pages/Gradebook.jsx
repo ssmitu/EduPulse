@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; // Removed useMemo
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -6,43 +6,33 @@ const Gradebook = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
 
-    // 1. Data State
-    const [data, setData] = useState({
-        assessments: [],
-        enrollments: [],
-        grades: [],
-        policy: 'Best 2 of 3 Quizzes'
-    });
+    // 1. Data States
+    const [assessments, setAssessments] = useState([]);
+    const [enrollments, setEnrollments] = useState([]);
+    const [grades, setGrades] = useState([]);
+    const [policy, setPolicy] = useState('Best 2 of 3 Quizzes');
+    const [loading, setLoading] = useState(true);
 
-    // 2. Refresh Trigger & UI States
+    // 2. UI States
     const [refreshKey, setRefreshKey] = useState(0);
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCol, setNewCol] = useState({ title: '', type: 1, maxMarks: 20 });
 
-    // --- STATE FOR SOFT SKILLS ---
-    const [selectedEnrollment, setSelectedEnrollment] = useState(null);
-    const [softSkills, setSoftSkills] = useState({
-        discipline: 3,
-        participation: 3,
-        collaboration: 3
-    });
-
     const API_BASE = "https://localhost:7096/api";
 
-    // 3. MAIN DATA FETCHING EFFECT
+    // 3. MAIN DATA FETCHING
     useEffect(() => {
         const fetchAllData = async () => {
-            const localToken = localStorage.getItem('token');
-            if (!localToken) return;
+            const token = localStorage.getItem('token');
+            if (!token) return;
 
-            const config = { headers: { Authorization: `Bearer ${localToken}` } };
+            const config = { headers: { Authorization: `Bearer ${token}` } };
             try {
                 const res = await axios.get(`${API_BASE}/Grades/course/${courseId}`, config);
 
                 const rawStudents = res.data.students || res.data.Students || [];
                 const rawAssessments = res.data.assessments || res.data.Assessments || [];
                 const rawGrades = res.data.grades || res.data.Grades || [];
-                const rawPolicy = res.data.policy || res.data.Policy || 'Best 2 of 3 Quizzes';
 
                 setData({
                     assessments: rawAssessments,
@@ -57,7 +47,6 @@ const Gradebook = () => {
                 console.error("Fetch error:", error);
             }
         };
-
         fetchAllData();
     }, [courseId, refreshKey]);
 
@@ -103,35 +92,21 @@ const Gradebook = () => {
         }
     };
 
-    // --- GRADING POLICY HANDLER ---
-    const handlePolicyChange = async (newPolicy) => {
-        const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        try {
-            await axios.post(`${API_BASE}/Assessments/course/${courseId}/policy`, { policy: newPolicy }, config);
-            setData(prev => ({ ...prev, policy: newPolicy }));
-        } catch {
-            alert("Failed to update policy");
-        }
+            if (existingIndex > -1) {
+                const newGrades = [...prev];
+                newGrades[existingIndex] = { ...newGrades[existingIndex], marksObtained: numericValue };
+                return newGrades;
+            } else {
+                return [...prev, { studentId, assessmentId, marksObtained: numericValue }];
+            }
+        });
     };
 
-    // --- DELETE COLUMN HANDLER ---
-    const handleDeleteColumn = async (id) => {
-        if (!window.confirm("Delete this column and all its marks?")) return;
+    const saveMarkToServer = async (studentId, assessmentId, value) => {
         const token = localStorage.getItem('token');
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        try {
-            await axios.delete(`${API_BASE}/Assessments/${id}`, config);
-            setRefreshKey(old => old + 1);
-        } catch {
-            alert("Delete failed.");
-        }
-    };
+        const numericValue = value === "" ? 0 : parseFloat(value);
 
-    // --- ADD COLUMN HANDLER ---
-    const handleAddColumn = async () => {
-        const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` } };
         try {
             await axios.post(`${API_BASE}/Assessments`,
                 {
@@ -157,12 +132,13 @@ const Gradebook = () => {
 
         try {
             await axios.post(`${API_BASE}/Grades/bulk-update`,
-                [{ studentId, assessmentId, marksObtained: numericMark }],
+                [{ studentId, assessmentId, marksObtained: numericValue }],
                 config
             );
+        } catch (err) {
+            console.error("Save error:", err);
+            alert("Failed to save to server.");
             setRefreshKey(old => old + 1);
-        } catch (error) {
-            console.error("Mark update failed", error);
         }
     };
 
@@ -209,17 +185,15 @@ const Gradebook = () => {
         };
     };
 
+    if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Gradebook...</div>;
+
     return (
         <div className="dashboard-container">
             <div className="header-strip">
                 <button onClick={() => navigate(-1)} className="btn-action">← Back</button>
                 <h2>Course Gradebook: {courseId}</h2>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <select
-                        className="form-input"
-                        value={data.policy}
-                        onChange={e => handlePolicyChange(e.target.value)}
-                    >
+                    <select className="form-input" value={policy} onChange={e => setPolicy(e.target.value)}>
                         <option>Best 2 of 3 Quizzes</option>
                         <option>Best 3 of 4 Quizzes</option>
                     </select>
@@ -227,7 +201,6 @@ const Gradebook = () => {
                 </div>
             </div>
 
-            {/* Step 1: Mark Entry */}
             <div className="user-info-card" style={{ marginTop: 20 }}>
                 <h3>Step 1: Mark Entry Spreadsheet</h3>
                 <div style={{ overflowX: 'auto' }}>
@@ -242,10 +215,7 @@ const Gradebook = () => {
                                             <button
                                                 onClick={() => handleDeleteColumn(a.id || a.Id)}
                                                 style={{ border: 'none', background: 'none', cursor: 'pointer', marginLeft: 8 }}
-                                                title="Delete column"
-                                            >
-                                                🗑️
-                                            </button>
+                                            >🗑️</button>
                                         </div>
                                     </th>
                                 ))}
@@ -263,11 +233,7 @@ const Gradebook = () => {
                                                 <input
                                                     type="number"
                                                     className="form-input"
-                                                    style={{
-                                                        width: '60px',
-                                                        textAlign: 'center',
-                                                        backgroundColor: isAuto ? '#f8f9fa' : 'white'
-                                                    }}
+                                                    style={{ width: '60px', textAlign: 'center', backgroundColor: isAuto ? '#f8f9fa' : 'white' }}
                                                     readOnly={isAuto}
                                                     defaultValue={g ? (g.marksObtained || g.MarksObtained) : ''}
                                                     onBlur={ev => isAuto ? null : updateMark(e.studentId, (a.id || a.Id), ev.target.value)}
@@ -282,7 +248,6 @@ const Gradebook = () => {
                 </div>
             </div>
 
-            {/* Step 2: Promotion Engine */}
             <div className="admin-section" style={{ marginTop: 30 }}>
                 <h3>Step 2: Promotion Engine</h3>
                 <table className="admin-table">
@@ -294,7 +259,6 @@ const Gradebook = () => {
                             <th>Final (70)</th>
                             <th>Total Weighted Score</th>
                             <th>Status</th>
-                            <th>Behavior</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -302,7 +266,7 @@ const Gradebook = () => {
                             const stats = calculateStats(e.studentId);
                             return (
                                 <tr key={e.studentId}>
-                                    <td style={{ textAlign: 'left', fontWeight: '500' }}>{e.student?.name}</td>
+                                    <td style={{ textAlign: 'left', fontWeight: '500' }}>{e.name}</td>
                                     <td>{stats.attendance}</td>
                                     <td>{stats.quizzes}</td>
                                     <td>{stats.final}</td>
@@ -312,9 +276,6 @@ const Gradebook = () => {
                                             {parseFloat(stats.total) >= 40 ? 'PASS' : 'FAIL'}
                                         </span>
                                     </td>
-                                    <td>
-                                        <button onClick={() => handleOpenRateModal(e)} className="btn-action" style={{ backgroundColor: '#f39c12' }}>⭐ Rate</button>
-                                    </td>
                                 </tr>
                             )
                         })}
@@ -322,32 +283,6 @@ const Gradebook = () => {
                 </table>
             </div>
 
-            {/* Evaluation Modal */}
-            {selectedEnrollment && (
-                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1001 }}>
-                    <div className="user-info-card" style={{ width: '400px' }}>
-                        <h3>Rate Soft Skills: {selectedEnrollment.student.name}</h3>
-                        <div style={{ marginBottom: 15 }}>
-                            <label>Discipline (1-5)</label>
-                            <input type="number" min="1" max="5" className="form-input" style={{ width: '100%' }} value={softSkills.discipline} onChange={e => setSoftSkills({ ...softSkills, discipline: parseInt(e.target.value) })} />
-                        </div>
-                        <div style={{ marginBottom: 15 }}>
-                            <label>Participation (1-5)</label>
-                            <input type="number" min="1" max="5" className="form-input" style={{ width: '100%' }} value={softSkills.participation} onChange={e => setSoftSkills({ ...softSkills, participation: parseInt(e.target.value) })} />
-                        </div>
-                        <div style={{ marginBottom: 15 }}>
-                            <label>Collaboration (1-5)</label>
-                            <input type="number" min="1" max="5" className="form-input" style={{ width: '100%' }} value={softSkills.collaboration} onChange={e => setSoftSkills({ ...softSkills, collaboration: parseInt(e.target.value) })} />
-                        </div>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                            <button onClick={handleSaveSoftSkills} className="btn-approve" style={{ flex: 1 }}>Save Ratings</button>
-                            <button onClick={() => setSelectedEnrollment(null)} className="btn-action" style={{ flex: 1, backgroundColor: 'gray' }}>Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Add Column Modal */}
             {showAddModal && (
                 <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
                     <div className="user-info-card" style={{ width: '400px' }}>
@@ -363,7 +298,13 @@ const Gradebook = () => {
                         <label>Max Marks</label>
                         <input type="number" className="form-input" style={{ width: '100%', marginBottom: 15 }} placeholder="20" onChange={e => setNewCol({ ...newCol, maxMarks: parseFloat(e.target.value) })} />
                         <div style={{ display: 'flex', gap: 10 }}>
-                            <button onClick={handleAddColumn} className="btn-approve" style={{ flex: 1 }}>Create Column</button>
+                            <button onClick={async () => {
+                                try {
+                                    await axios.post(`${API_BASE}/Assessments`, { ...newCol, date: new Date().toISOString(), weightage: 0, courseId: parseInt(courseId) }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+                                    setShowAddModal(false);
+                                    setRefreshKey(k => k + 1);
+                                } catch (err) { console.error(err); alert("Error adding column"); }
+                            }} className="btn-approve" style={{ flex: 1 }}>Create Column</button>
                             <button onClick={() => setShowAddModal(false)} className="btn-action" style={{ flex: 1 }}>Cancel</button>
                         </div>
                     </div>

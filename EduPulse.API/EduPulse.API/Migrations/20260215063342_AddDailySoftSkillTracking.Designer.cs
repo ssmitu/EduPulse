@@ -4,6 +4,7 @@ using EduPulse.API.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EduPulse.API.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260215063342_AddDailySoftSkillTracking")]
+    partial class AddDailySoftSkillTracking
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -184,6 +187,32 @@ namespace EduPulse.API.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Departments");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "CSE",
+                            TeacherVerificationKey = "CSE-KEY"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Name = "EEE",
+                            TeacherVerificationKey = "EEE-KEY"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Name = "BBA",
+                            TeacherVerificationKey = "BBA-KEY"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Name = "English",
+                            TeacherVerificationKey = "ENG-KEY"
+                        });
                 });
 
             modelBuilder.Entity("EduPulse.API.Models.Enrollment", b =>

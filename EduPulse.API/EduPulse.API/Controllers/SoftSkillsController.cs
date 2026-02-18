@@ -16,7 +16,31 @@ namespace EduPulse.API.Controllers
             _context = context;
         }
 
-        // POST: api/SoftSkills/upsert
+        // 1. GET HISTORY (For Charting)
+        [HttpGet("history/{courseId}/{studentId}")]
+        public async Task<IActionResult> GetStudentHistory(int courseId, int studentId)
+        {
+            var enrollment = await _context.Enrollments
+                .FirstOrDefaultAsync(e => e.CourseId == courseId && e.StudentId == studentId);
+
+            if (enrollment == null) return NotFound("Student not enrolled.");
+
+            var history = await _context.SoftSkills
+                .Where(s => s.EnrollmentId == enrollment.Id)
+                .OrderBy(s => s.Date)
+                .Select(s => new
+                {
+                    Date = s.Date.ToString("yyyy-MM-dd"),
+                    s.Discipline,
+                    s.Participation,
+                    s.Collaboration
+                })
+                .ToListAsync();
+
+            return Ok(history);
+        }
+
+        // 2. UPSERT (The Daily Pulse Override)
         [HttpPost("upsert")]
         public async Task<IActionResult> UpsertSoftSkill([FromBody] SoftSkillRequest request)
         {
@@ -25,15 +49,18 @@ namespace EduPulse.API.Controllers
 
             if (enrollment == null) return NotFound(new { message = "Student not enrolled." });
 
-            var today = DateTime.Now.Date;
-            var existingToday = await _context.SoftSkills
-                .FirstOrDefaultAsync(s => s.EnrollmentId == enrollment.Id && s.LastUpdated.Date == today);
+            // ✅ CRITICAL FIX: Use the Date provided by the UI, not DateTime.Today
+            var targetDate = request.Date.Date;
 
-            if (existingToday == null)
+            var existingRecord = await _context.SoftSkills
+                .FirstOrDefaultAsync(s => s.EnrollmentId == enrollment.Id && s.Date == targetDate);
+
+            if (existingRecord == null)
             {
                 _context.SoftSkills.Add(new SoftSkill
                 {
                     EnrollmentId = enrollment.Id,
+                    Date = targetDate,
                     Discipline = request.Discipline,
                     Participation = request.Participation,
                     Collaboration = request.Collaboration,
@@ -42,43 +69,17 @@ namespace EduPulse.API.Controllers
             }
             else
             {
-                existingToday.Discipline = request.Discipline;
-                existingToday.Participation = request.Participation;
-                existingToday.Collaboration = request.Collaboration;
-                existingToday.LastUpdated = DateTime.Now;
+                existingRecord.Discipline = request.Discipline;
+                existingRecord.Participation = request.Participation;
+                existingRecord.Collaboration = request.Collaboration;
+                existingRecord.LastUpdated = DateTime.Now;
             }
 
             await _context.SaveChangesAsync();
-            return Ok(new { message = "Behavior recorded!" });
+            return Ok(new { message = "Behavior recorded for " + targetDate.ToShortDateString() });
         }
 
-        // ✅ FIXED: Now accepts a single EnrollmentId (matches your Frontend)
-        // GET: api/SoftSkills/enrollment/{enrollmentId}
-        [HttpGet("enrollment/{enrollmentId}")]
-        public async Task<IActionResult> GetLatestRatingByEnrollment(int enrollmentId)
-        {
-            // Find the most recent soft skill entry for this enrollment ID
-            var skill = await _context.SoftSkills
-                .Where(s => s.EnrollmentId == enrollmentId)
-                .OrderByDescending(s => s.LastUpdated)
-                .FirstOrDefaultAsync();
-
-            // If no rating exists yet, return empty defaults so the frontend doesn't crash
-            if (skill == null)
-            {
-                return Ok(new SoftSkill
-                {
-                    EnrollmentId = enrollmentId,
-                    Discipline = 0,
-                    Participation = 0,
-                    Collaboration = 0
-                });
-            }
-
-            return Ok(skill);
-        }
-
-        // (Optional) Keep this if you use it elsewhere, otherwise it can be removed
+        // 3. GET LATEST (For the Teacher Modal)
         [HttpGet("enrollment/{studentId}/{courseId}")]
         public async Task<IActionResult> GetLatestRating(int studentId, int courseId)
         {
@@ -89,7 +90,7 @@ namespace EduPulse.API.Controllers
 
             var skill = await _context.SoftSkills
                 .Where(s => s.EnrollmentId == enrollment.Id)
-                .OrderByDescending(s => s.LastUpdated)
+                .OrderByDescending(s => s.Date)
                 .FirstOrDefaultAsync();
 
             return Ok(skill);
@@ -100,6 +101,7 @@ namespace EduPulse.API.Controllers
     {
         public int StudentId { get; set; }
         public int CourseId { get; set; }
+        public DateTime Date { get; set; } // ✅ Now correctly handled
         public int Discipline { get; set; }
         public int Participation { get; set; }
         public int Collaboration { get; set; }

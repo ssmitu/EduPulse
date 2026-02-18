@@ -23,27 +23,30 @@ namespace EduPulse.API.Controllers
         [HttpGet("dashboard/{studentId}/{courseId}")]
         public async Task<IActionResult> GetStudentDashboard(int studentId, int courseId)
         {
-            // 1. Fetch Basic Data
+            // 1. Validate Enrollment
             var enrollment = await _context.Enrollments
                 .FirstOrDefaultAsync(e => e.StudentId == studentId && e.CourseId == courseId);
 
             if (enrollment == null) return NotFound("Student not enrolled.");
 
+            // 2. Fetch Base Data
             var assessments = await _context.Assessments.Where(a => a.CourseId == courseId).ToListAsync();
+
+            // FIX: Extract IDs to a simple list first to ensure EF Core translates the SQL IN clause correctly
+            var assessmentIds = assessments.Select(a => a.Id).ToList();
+
             var grades = await _context.Grades
-                .Where(g => g.StudentId == studentId && assessments.Select(a => a.Id).Contains(g.AssessmentId))
+                .Where(g => g.StudentId == studentId && assessmentIds.Contains(g.AssessmentId))
                 .ToListAsync();
 
-            var softSkillHistory = await _context.SoftSkills
+            var allSoftSkills = await _context.SoftSkills
                 .Where(s => s.EnrollmentId == enrollment.Id)
-                .OrderBy(s => s.LastUpdated)
                 .ToListAsync();
 
-            // 2. Attendance Calculation (Live Service)
+            // 3. --- HEALTH BAR CALCULATION ---
             var attendanceSummary = await _attendanceService.CalculateStudentAttendanceAsync(courseId, studentId);
             double liveAttendancePoints = attendanceSummary.GradePoints;
 
-            // --- HEALTH BAR LOGIC (Academic Health Status) ---
             var quizGrades = grades
                 .Where(g => assessments.Any(a => a.Id == g.AssessmentId && a.Type == AssessmentType.Quiz))
                 .OrderByDescending(g => g.MarksObtained).Take(2).ToList();
@@ -54,18 +57,19 @@ namespace EduPulse.API.Controllers
             double weightedFinal = finalGrade != null ? (double)finalGrade.MarksObtained : 0;
 
             double currentPct = Math.Round(Math.Min(liveAttendancePoints + weightedQuizzes + weightedFinal, 100), 1);
+            string healthStatus = currentPct >= 70 ? "On Track" : (currentPct >= 40 ? "Needs Improvement" : "At Risk");
 
-            // --- 3. BUILD TIMELINE (The Graph Data) ---
+            // 4. --- TIMELINE GENERATION (FIXED) ---
+
             var timeline = new List<PerformanceTimelinePoint>();
 
-            // --- A. Add Gradebook Events (Attendance & Exams) ---
+            // STEP A: Add ALL Academic Assessments 
+            // We use a List (not a Dictionary) so if 2 exams happen on the same day, both are shown.
             foreach (var ass in assessments)
             {
                 double? pct = null;
                 if (ass.Type == AssessmentType.Attendance)
-                {
                     pct = ass.MaxMarks > 0 ? Math.Round((liveAttendancePoints / ass.MaxMarks) * 100, 1) : 0;
-                }
                 else
                 {
                     var grade = grades.FirstOrDefault(g => g.AssessmentId == ass.Id);
@@ -76,65 +80,64 @@ namespace EduPulse.API.Controllers
                 timeline.Add(new PerformanceTimelinePoint
                 {
                     EventName = ass.Title,
-                    Date = ass.Date.Date, // Use Date part only for stable sorting
-                    GradePercentage = pct,
-                    SoftSkillRating = null
+                    Date = ass.Date.Date,
+                    GradePercentage = pct
+                    // Soft skills will be injected in Step C
                 });
             }
 
-            // --- B. Add Weekly Soft Skill Reviews ---
-            if (softSkillHistory.Any())
-            {
-                // Logic: Group reviews by week and "snap" them to the end of that week (Friday)
-                // This makes the graph consistent for every student in the course.
-                var weeklyGroups = softSkillHistory.GroupBy(s => {
-                    DateTime d = s.LastUpdated.Date;
-                    int diff = (int)DayOfWeek.Friday - (int)d.DayOfWeek;
-                    if (diff < -1) diff += 7; // If recorded on Sat/Sun, snap to next Friday
-                    return d.AddDays(diff).Date;
-                });
+            // STEP B: Identify "Recent 7" Soft Skill Days
+            var recentSoftSkillDates = allSoftSkills
+                .Select(s => s.Date.Date)
+                .Distinct()
+                .OrderByDescending(d => d)
+                .Take(7)
+                .ToHashSet();
 
-                int weekCount = 1;
-                foreach (var group in weeklyGroups.OrderBy(g => g.Key))
+            // Find days that have Soft Skills but NO Assessment (so the line doesn't break)
+            var existingAssessmentDates = timeline.Select(t => t.Date).ToHashSet();
+
+            foreach (var date in recentSoftSkillDates)
+            {
+                if (!existingAssessmentDates.Contains(date))
                 {
-                    double avg = group.Average(s => (s.Discipline + s.Participation + s.Collaboration) / 3.0);
                     timeline.Add(new PerformanceTimelinePoint
                     {
-                        EventName = $"Week {weekCount} Review",
-                        Date = group.Key,
-                        GradePercentage = null,
-                        SoftSkillRating = Math.Round(avg, 1)
+                        EventName = date.ToString("MMM dd"),
+                        Date = date,
+                        GradePercentage = null // No blue dot, just behavioral
                     });
-                    weekCount++;
                 }
             }
 
-            // --- 4. STABLE SORTING & DATA CONTINUITY ---
-            // Fix: Sort by Date, then ensure Grades (Blue Line) appear before Reviews (Orange Line) on the same day.
-            timeline = timeline
-                .OrderBy(t => t.Date)
-                .ThenBy(t => t.GradePercentage == null ? 1 : 0) // Academics first, Review second
-                .ToList();
-
-            // Logic: The Orange Line needs a value at every point to stay continuous.
-            // If a point has no rating (like a Quiz point), we carry over the last known behavior rating.
-            double? lastBehavior = 3.0; // Default middle starting point
+            // STEP C: Inject Soft Skill Ratings into the Timeline
+            // We loop through the whole timeline. If a point's date matches our "Recent 7", we add the ratings.
             foreach (var point in timeline)
             {
-                if (point.SoftSkillRating.HasValue)
-                    lastBehavior = point.SoftSkillRating.Value;
-                else
-                    point.SoftSkillRating = lastBehavior;
+                if (recentSoftSkillDates.Contains(point.Date))
+                {
+                    // Get entries strictly for THIS day
+                    var daysEntries = allSoftSkills.Where(s => s.Date.Date == point.Date).ToList();
+
+                    if (daysEntries.Any())
+                    {
+                        point.DisciplineRating = Math.Round(daysEntries.Average(s => (double)s.Discipline), 1);
+                        point.ParticipationRating = Math.Round(daysEntries.Average(s => (double)s.Participation), 1);
+                        point.CollaborationRating = Math.Round(daysEntries.Average(s => (double)s.Collaboration), 1);
+                    }
+                }
             }
 
-            // 5. Final Result Construction
+            // Final Sort
+            timeline = timeline.OrderBy(t => t.Date).ToList();
+
             return Ok(new AcademicHealthDashboardDto
             {
                 StudentId = studentId,
                 CourseId = courseId,
                 CourseName = (await _context.Courses.FindAsync(courseId))?.Title ?? "Course",
                 CurrentPercentage = currentPct,
-                AcademicHealthStatus = currentPct >= 70 ? "On Track" : (currentPct >= 40 ? "Needs Improvement" : "At Risk"),
+                AcademicHealthStatus = healthStatus,
                 Timeline = timeline
             });
         }

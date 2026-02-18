@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace EduPulse.API.DTOs
+﻿namespace EduPulse.API.DTOs
 {
     public class AcademicHealthDashboardDto
     {
@@ -15,9 +12,11 @@ namespace EduPulse.API.DTOs
 
     public class PerformanceTimelinePoint
     {
-        public string EventName { get; set; } = string.Empty; // "Quiz 1" or "Behavior Update"
+        public string EventName { get; set; } = string.Empty;
         public DateTime Date { get; set; }
-        public double? GradePercentage { get; set; } // Null if only behavior was updated
-        public double? SoftSkillRating { get; set; } // Null if only a grade was entered
+        public double? GradePercentage { get; set; }
+        public double? DisciplineRating { get; set; }
+        public double? ParticipationRating { get; set; }
+        public double? CollaborationRating { get; set; }
     }
 }
