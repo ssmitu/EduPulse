@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Removed useMemo
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 
@@ -6,21 +6,26 @@ const Gradebook = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
 
-    // 1. Data States
-    const [assessments, setAssessments] = useState([]);
-    const [enrollments, setEnrollments] = useState([]);
-    const [grades, setGrades] = useState([]);
-    const [policy, setPolicy] = useState('Best 2 of 3 Quizzes');
+    // 1. Unified State (to match your render logic)
+    const [data, setData] = useState({
+        assessments: [],
+        enrollments: [],
+        grades: [],
+        policy: 'Best 2 of 3 Quizzes'
+    });
+
     const [loading, setLoading] = useState(true);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     // 2. UI States
-    const [refreshKey, setRefreshKey] = useState(0);
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCol, setNewCol] = useState({ title: '', type: 1, maxMarks: 20 });
 
+   
+
     const API_BASE = "https://localhost:7096/api";
 
-    // 3. MAIN DATA FETCHING
+    // --- MAIN DATA FETCHING ---
     useEffect(() => {
         const fetchAllData = async () => {
             const token = localStorage.getItem('token');
@@ -33,106 +38,65 @@ const Gradebook = () => {
                 const rawStudents = res.data.students || res.data.Students || [];
                 const rawAssessments = res.data.assessments || res.data.Assessments || [];
                 const rawGrades = res.data.grades || res.data.Grades || [];
+                // Fixed: Check if policy exists, otherwise default
+                const rawPolicy = res.data.policy || 'Best 2 of 3 Quizzes';
 
                 setData({
                     assessments: rawAssessments,
                     grades: rawGrades,
                     enrollments: rawStudents.map(s => ({
                         studentId: s.studentId || s.StudentId,
-                        student: { name: s.name || s.Name || "Unknown" }
+                        // handle nested student object safely
+                        name: s.name || s.Name || (s.student ? s.student.name : "Unknown"),
+                        student: s // keep original ref just in case
                     })),
                     policy: rawPolicy
                 });
+                setLoading(false);
             } catch (error) {
                 console.error("Fetch error:", error);
+                setLoading(false);
             }
         };
         fetchAllData();
     }, [courseId, refreshKey]);
 
-    // --- HANDLER TO FETCH LATEST SKILLS & OPEN MODAL ---
-    const handleOpenRateModal = async (enrollment) => {
-        setSelectedEnrollment(enrollment);
+    // --- HANDLERS ---
+
+    const handleDeleteColumn = async (assessmentId) => {
+        if (!window.confirm("Are you sure you want to delete this column?")) return;
+
         const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-
         try {
-            // Fetch the latest entry so the teacher doesn't start from scratch
-            const res = await axios.get(`${API_BASE}/SoftSkills/enrollment/${enrollment.studentId}/${courseId}`, config);
-            if (res.data) {
-                setSoftSkills({
-                    discipline: res.data.discipline || 3,
-                    participation: res.data.participation || 3,
-                    collaboration: res.data.collaboration || 3
-                });
-            }
-        } catch (error) {
-            console.error("Fetch skills error:", error); // Use the variable here
-            setSoftSkills({ discipline: 3, participation: 3, collaboration: 3 });
-        }
-    };
-
-    const handleSaveSoftSkills = async () => {
-        const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        try {
-            await axios.post(`${API_BASE}/SoftSkills/upsert`, {
-                studentId: selectedEnrollment.studentId,
-                courseId: parseInt(courseId),
-                discipline: softSkills.discipline,
-                participation: softSkills.participation,
-                collaboration: softSkills.collaboration
-            }, config);
-
-            alert(`Weekly behavior recorded for ${selectedEnrollment.student.name}`);
-            setSelectedEnrollment(null);
-        } catch (error) {
-            console.error("Save skills error:", error); // Use the variable here
-            alert("Error saving soft skills.");
-        }
-    };
-
-            if (existingIndex > -1) {
-                const newGrades = [...prev];
-                newGrades[existingIndex] = { ...newGrades[existingIndex], marksObtained: numericValue };
-                return newGrades;
-            } else {
-                return [...prev, { studentId, assessmentId, marksObtained: numericValue }];
-            }
-        });
-    };
-
-    const saveMarkToServer = async (studentId, assessmentId, value) => {
-        const token = localStorage.getItem('token');
-        const config = { headers: { Authorization: `Bearer ${token}` } };
-        const numericValue = value === "" ? 0 : parseFloat(value);
-
-        try {
-            await axios.post(`${API_BASE}/Assessments`,
-                {
-                    ...newCol,
-                    date: new Date().toISOString(), // FIXED: Prevents 1/1/1 bug
-                    weightage: 0,
-                    courseId: parseInt(courseId)
-                },
-                config
-            );
-            setShowAddModal(false);
+            await axios.delete(`${API_BASE}/Assessments/${assessmentId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             setRefreshKey(old => old + 1);
-        } catch {
-            alert("Error adding column");
+        } catch (error) {
+            console.error(error);
+            alert("Failed to delete column");
         }
     };
 
-    // --- UPDATE MARKS ---
     const updateMark = async (studentId, assessmentId, mark) => {
         const token = localStorage.getItem('token');
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const numericMark = parseFloat(mark) || 0;
+        const numericMark = mark === "" ? 0 : parseFloat(mark); // Fixed variable name usage below
+
+        // Optimistic UI update (optional, prevents flickering)
+        const updatedGrades = [...data.grades];
+        const existingIndex = updatedGrades.findIndex(g => g.studentId === studentId && g.assessmentId === assessmentId);
+
+        if (existingIndex > -1) {
+            updatedGrades[existingIndex].marksObtained = numericMark;
+        } else {
+            updatedGrades.push({ studentId, assessmentId, marksObtained: numericMark });
+        }
+        setData(prev => ({ ...prev, grades: updatedGrades }));
 
         try {
             await axios.post(`${API_BASE}/Grades/bulk-update`,
-                [{ studentId, assessmentId, marksObtained: numericValue }],
+                [{ studentId, assessmentId, marksObtained: numericMark }], // Fixed: used numericMark instead of numericValue
                 config
             );
         } catch (err) {
@@ -142,7 +106,7 @@ const Gradebook = () => {
         }
     };
 
-    // --- CALCULATION LOGIC (Best X of Y) ---
+    // --- CALCULATION LOGIC ---
     const calculateStats = (studentId) => {
         const studentGrades = (data.grades || []).filter(g => (g.studentId || g.StudentId) === studentId);
         const assessments = data.assessments || [];
@@ -156,9 +120,14 @@ const Gradebook = () => {
                 return g ? (g.marksObtained || g.MarksObtained || 0) : 0;
             });
             scores.sort((a, b) => b - a);
-            const pickCount = data.policy.includes('Best 3') ? 3 : 2;
+            // Safety check for policy string
+            const currentPolicy = data.policy || '';
+            const pickCount = currentPolicy.includes('Best 3') ? 3 : 2;
             const actualToPick = Math.min(scores.length, pickCount);
-            quizScore = scores.slice(0, actualToPick).reduce((a, b) => a + b, 0) / (actualToPick || 1);
+
+            // Avoid division by zero
+            const divisor = actualToPick || 1;
+            quizScore = scores.slice(0, actualToPick).reduce((a, b) => a + b, 0) / divisor;
         }
 
         // 2. Attendance
@@ -193,7 +162,7 @@ const Gradebook = () => {
                 <button onClick={() => navigate(-1)} className="btn-action">← Back</button>
                 <h2>Course Gradebook: {courseId}</h2>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <select className="form-input" value={policy} onChange={e => setPolicy(e.target.value)}>
+                    <select className="form-input" value={data.policy} onChange={e => setData({ ...data, policy: e.target.value })}>
                         <option>Best 2 of 3 Quizzes</option>
                         <option>Best 3 of 4 Quizzes</option>
                     </select>
@@ -224,7 +193,7 @@ const Gradebook = () => {
                         <tbody>
                             {(data.enrollments || []).map(e => (
                                 <tr key={e.studentId}>
-                                    <td>{e.student?.name}</td>
+                                    <td>{e.name}</td>
                                     {(data.assessments || []).map(a => {
                                         const g = (data.grades || []).find(gr => (gr.assessmentId || gr.AssessmentId) === (a.id || a.Id) && (gr.studentId || gr.StudentId) === e.studentId);
                                         const isAuto = (a.type === 0 || a.Type === 0);
