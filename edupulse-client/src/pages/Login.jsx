@@ -27,7 +27,7 @@ const Login = () => {
     return (
         <div className="auth-wrapper">
             <div className="auth-card">
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} autoComplete="off">
                     <h2>EduPulse Login</h2>
 
                     {error && <div className="error-msg">{error}</div>}
@@ -40,6 +40,10 @@ const Login = () => {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
+                            autoComplete="username"
+                            /* THE READ-ONLY TRICK */
+                            readOnly={true}
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                         />
                     </div>
 
@@ -51,6 +55,10 @@ const Login = () => {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
+                            autoComplete="current-password"
+                            /* THE READ-ONLY TRICK */
+                            readOnly={true}
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
                         />
                     </div>
 

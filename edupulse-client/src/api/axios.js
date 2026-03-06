@@ -1,12 +1,12 @@
 import axios from 'axios';
 
 const API = axios.create({
-    baseURL: 'https://localhost:7096/api', // Make sure this matches your API port!
+    baseURL: 'https://localhost:7096/api',
 });
 
-// This automatically adds the JWT token to every request if the user is logged in
+// Automatically add the JWT token from sessionStorage to every request
 API.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
