@@ -7,9 +7,10 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // When the app starts, check if a user is already logged in
-        const storedUser = localStorage.getItem('user');
-        const token = localStorage.getItem('token');
+        // Check sessionStorage instead of localStorage
+        const storedUser = sessionStorage.getItem('user');
+        const token = sessionStorage.getItem('token');
+
         if (storedUser && token) {
             setUser(JSON.parse(storedUser));
         }
@@ -17,14 +18,14 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = (userData, token) => {
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
+        sessionStorage.setItem('token', token);
+        sessionStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
     };
 
     const logout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
         setUser(null);
     };
 
