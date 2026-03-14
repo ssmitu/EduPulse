@@ -36,17 +36,18 @@ const StudentGradeView = () => {
 
     useEffect(() => {
         const fetchAllData = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) return;
+            // ✅ FIXED: Look in sessionStorage for ACCESS_TOKEN
+            const token = sessionStorage.getItem('ACCESS_TOKEN');
+            if (!token) {
+                setLoading(false);
+                return;
+            }
 
             // Wait until user context is loaded
             if (!user || !user.id) return;
 
             const config = { headers: { Authorization: `Bearer ${token}` } };
 
-            // =================================================================
-            // 1. Fetch Gap Analysis (Graph) - INDEPENDENT CALL
-            // =================================================================
             try {
                 const gapRes = await axios.get(`${API_BASE}/Grades/gap-analysis/${courseId}`, config);
                 setGapAnalysis(gapRes.data || []);
@@ -55,9 +56,6 @@ const StudentGradeView = () => {
                 setGapAnalysis([]);
             }
 
-            // =================================================================
-            // 2. Fetch Grades (Table Data)
-            // =================================================================
             try {
                 const res = await axios.get(`${API_BASE}/Grades/student/${courseId}`, config);
                 setData(res.data);
@@ -65,15 +63,10 @@ const StudentGradeView = () => {
                 console.error("Error fetching grades:", error);
             }
 
-            // =================================================================
-            // 3. Fetch Soft Skills (Radar Chart) - FIXED
-            // We use user.id + courseId to avoid the "1:1" enrollmentId bug
-            // =================================================================
             try {
                 const skillRes = await axios.get(`${API_BASE}/SoftSkills/enrollment/${user.id}/${courseId}`, config);
                 setSoftSkills(skillRes.data);
             } catch (skillError) {
-                // ✅ FIXED: We now use 'skillError' in the console log to satisfy the linter
                 console.warn("Soft skills info not found (normal if not rated yet).", skillError);
                 setSoftSkills({ discipline: 0, participation: 0, collaboration: 0 });
             } finally {

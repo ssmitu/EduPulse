@@ -7,9 +7,9 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check sessionStorage instead of localStorage
+        // MUST use sessionStorage and ACCESS_TOKEN
         const storedUser = sessionStorage.getItem('user');
-        const token = sessionStorage.getItem('token');
+        const token = sessionStorage.getItem('ACCESS_TOKEN');
 
         if (storedUser && token) {
             setUser(JSON.parse(storedUser));
@@ -18,13 +18,15 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = (userData, token) => {
-        sessionStorage.setItem('token', token);
+        // MUST use sessionStorage and ACCESS_TOKEN
+        sessionStorage.setItem('ACCESS_TOKEN', token);
         sessionStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
     };
 
     const logout = () => {
-        sessionStorage.removeItem('token');
+        // MUST use sessionStorage and ACCESS_TOKEN
+        sessionStorage.removeItem('ACCESS_TOKEN');
         sessionStorage.removeItem('user');
         setUser(null);
     };
