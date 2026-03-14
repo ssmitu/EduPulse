@@ -4,9 +4,9 @@ const API = axios.create({
     baseURL: 'https://localhost:7096/api',
 });
 
-// Automatically add the JWT token from sessionStorage to every request
 API.interceptors.request.use((config) => {
-    const token = sessionStorage.getItem('token');
+    // MUST match the key and storage type used in AuthContext
+    const token = sessionStorage.getItem('ACCESS_TOKEN');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }

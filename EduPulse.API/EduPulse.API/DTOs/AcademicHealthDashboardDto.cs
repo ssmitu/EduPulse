@@ -15,9 +15,13 @@ namespace EduPulse.API.DTOs
 
     public class PerformanceTimelinePoint
     {
-        public string EventName { get; set; } = string.Empty; // "Quiz 1" or "Behavior Update"
+        public string EventName { get; set; } = string.Empty;
         public DateTime Date { get; set; }
-        public double? GradePercentage { get; set; } // Null if only behavior was updated
-        public double? SoftSkillRating { get; set; } // Null if only a grade was entered
+        public double? GradePercentage { get; set; }
+
+        // REPLACED SoftSkillRating with the 3 distinct traits
+        public double? DisciplineRating { get; set; }
+        public double? ParticipationRating { get; set; }
+        public double? CollaborationRating { get; set; }
     }
 }
