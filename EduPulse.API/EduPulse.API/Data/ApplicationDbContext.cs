@@ -19,6 +19,7 @@ namespace EduPulse.API.Data
         public DbSet<Grade> Grades { get; set; }
         public DbSet<SoftSkill> SoftSkills { get; set; }
         public DbSet<Attendance> Attendances { get; set; }
+        public DbSet<CourseResult> CourseResults { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -6,7 +6,6 @@ const Gradebook = () => {
     const { courseId } = useParams();
     const navigate = useNavigate();
 
-    // 1. Unified State (to match your render logic)
     const [data, setData] = useState({
         assessments: [],
         enrollments: [],
@@ -16,17 +15,13 @@ const Gradebook = () => {
 
     const [loading, setLoading] = useState(true);
     const [refreshKey, setRefreshKey] = useState(0);
-
-    // 2. UI States
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCol, setNewCol] = useState({ title: '', type: 1, maxMarks: 20 });
 
     const API_BASE = "https://localhost:7096/api";
 
-    // --- MAIN DATA FETCHING ---
     useEffect(() => {
         const fetchAllData = async () => {
-            // UPDATED: Changed from localStorage 'token' to sessionStorage 'ACCESS_TOKEN'
             const token = sessionStorage.getItem('ACCESS_TOKEN');
             if (!token) {
                 setLoading(false);
@@ -36,8 +31,7 @@ const Gradebook = () => {
             const config = { headers: { Authorization: `Bearer ${token}` } };
             try {
                 const res = await axios.get(`${API_BASE}/Grades/course/${courseId}`, config);
-
-                const rawStudents = res.data.students || res.data.Students || [];
+                const rawStudents = res.data.students || res.data.Students || res.data.$values || [];
                 const rawAssessments = res.data.assessments || res.data.Assessments || [];
                 const rawGrades = res.data.grades || res.data.Grades || [];
                 const rawPolicy = res.data.policy || 'Best 2 of 3 Quizzes';
@@ -45,7 +39,7 @@ const Gradebook = () => {
                 setData({
                     assessments: rawAssessments,
                     grades: rawGrades,
-                    enrollments: rawStudents.map(s => ({
+                    enrollments: (rawStudents.$values || rawStudents).map(s => ({
                         studentId: s.studentId || s.StudentId,
                         name: s.name || s.Name || (s.student ? s.student.name : "Unknown"),
                         student: s
@@ -61,12 +55,8 @@ const Gradebook = () => {
         fetchAllData();
     }, [courseId, refreshKey]);
 
-    // --- HANDLERS ---
-
     const handleDeleteColumn = async (assessmentId) => {
         if (!window.confirm("Are you sure you want to delete this column?")) return;
-
-        // UPDATED: Changed from localStorage 'token' to sessionStorage 'ACCESS_TOKEN'
         const token = sessionStorage.getItem('ACCESS_TOKEN');
         try {
             await axios.delete(`${API_BASE}/Assessments/${assessmentId}`, {
@@ -80,12 +70,10 @@ const Gradebook = () => {
     };
 
     const updateMark = async (studentId, assessmentId, mark) => {
-        // UPDATED: Changed from localStorage 'token' to sessionStorage 'ACCESS_TOKEN'
         const token = sessionStorage.getItem('ACCESS_TOKEN');
         const config = { headers: { Authorization: `Bearer ${token}` } };
         const numericMark = mark === "" ? 0 : parseFloat(mark);
 
-        // Optimistic UI update
         const updatedGrades = [...data.grades];
         const existingIndex = updatedGrades.findIndex(g => (g.studentId || g.StudentId) === studentId && (g.assessmentId || g.AssessmentId) === assessmentId);
 
@@ -108,49 +96,57 @@ const Gradebook = () => {
         }
     };
 
-    // --- CALCULATION LOGIC ---
+    // --- UPDATED CALCULATION LOGIC (Step 3) ---
     const calculateStats = (studentId) => {
         const studentGrades = (data.grades || []).filter(g => (g.studentId || g.StudentId) === studentId);
         const assessments = data.assessments || [];
 
-        // 1. Quizzes
-        const quizAssessments = assessments.filter(a => (a.type === 1 || a.Type === 1));
+        const findGrade = (type) => {
+            const ass = assessments.find(a => (a.type === type || a.Type === type));
+            if (!ass) return null;
+            const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (ass.id || ass.Id));
+            return g ? (g.marksObtained || g.MarksObtained || 0) : null;
+        };
+
+        const carryMark = findGrade(6);     // Type 6
+        const clearanceMark = findGrade(5); // Type 5
+        const finalMark = findGrade(3);     // Type 3
+        const attdScore = findGrade(0) || 0; // Type 0
+
         let quizScore = 0;
+        const quizAssessments = assessments.filter(a => (a.type === 1 || a.Type === 1));
         if (quizAssessments.length > 0) {
             const scores = quizAssessments.map(a => {
                 const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (a.id || a.Id));
                 return g ? (g.marksObtained || g.MarksObtained || 0) : 0;
             });
             scores.sort((a, b) => b - a);
-            const currentPolicy = data.policy || '';
-            const pickCount = currentPolicy.includes('Best 3') ? 3 : 2;
+            const pickCount = data.policy.includes('Best 3') ? 3 : 2;
             const actualToPick = Math.min(scores.length, pickCount);
-
-            const divisor = actualToPick || 1;
-            quizScore = scores.slice(0, actualToPick).reduce((a, b) => a + b, 0) / divisor;
+            quizScore = scores.slice(0, actualToPick).reduce((a, b) => a + b, 0) / (actualToPick || 1);
         }
 
-        // 2. Attendance
-        const attdAss = assessments.find(a => (a.type === 0 || a.Type === 0));
-        let attdScore = 0;
-        if (attdAss) {
-            const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (attdAss.id || attdAss.Id));
-            attdScore = g ? (g.marksObtained || g.MarksObtained || 0) : 0;
-        }
+        const caTotal = quizScore + attdScore;
+        let finalTotal = 0;
+        let displayExamScore = 0;
 
-        // 3. Final
-        const finalAss = assessments.find(a => (a.type === 3 || a.Type === 3));
-        let finalScore = 0;
-        if (finalAss) {
-            const g = studentGrades.find(gr => (gr.assessmentId || gr.AssessmentId) === (finalAss.id || finalAss.Id));
-            finalScore = g ? (g.marksObtained || g.MarksObtained || 0) : 0;
+        // PRIORITY LOGIC: Carry > Clearance > Regular
+        if (carryMark !== null) {
+            finalTotal = (carryMark / 70) * 100;
+            displayExamScore = carryMark;
+        } else if (clearanceMark !== null) {
+            finalTotal = caTotal + clearanceMark;
+            displayExamScore = clearanceMark;
+        } else {
+            finalTotal = caTotal + (finalMark || 0);
+            displayExamScore = finalMark || 0;
         }
 
         return {
             attendance: attdScore.toFixed(2),
             quizzes: quizScore.toFixed(2),
-            final: finalScore.toFixed(2),
-            total: Math.min(quizScore + attdScore + finalScore, 100).toFixed(2)
+            final: displayExamScore.toFixed(2),
+            total: Math.min(finalTotal, 100).toFixed(2)
         };
     };
 
@@ -199,13 +195,24 @@ const Gradebook = () => {
                                         const isAuto = (a.type === 0 || a.Type === 0);
                                         return (
                                             <td key={a.id || a.Id}>
+                                                {/* UPDATED: Validation logic for Max Marks (Step 2) */}
                                                 <input
                                                     type="number"
                                                     className="form-input"
                                                     style={{ width: '60px', textAlign: 'center', backgroundColor: isAuto ? '#f8f9fa' : 'white' }}
                                                     readOnly={isAuto}
                                                     defaultValue={g ? (g.marksObtained || g.MarksObtained) : ''}
-                                                    onBlur={ev => isAuto ? null : updateMark(e.studentId, (a.id || a.Id), ev.target.value)}
+                                                    onBlur={ev => {
+                                                        if (isAuto) return;
+                                                        const val = parseFloat(ev.target.value);
+                                                        const max = a.maxMarks || a.MaxMarks || 100;
+                                                        if (val > max) {
+                                                            alert(`Error: Mark (${val}) cannot exceed Max Marks (${max}) for ${a.title || a.Title}`);
+                                                            ev.target.value = g ? (g.marksObtained || g.MarksObtained) : '';
+                                                            return;
+                                                        }
+                                                        updateMark(e.studentId, (a.id || a.Id), ev.target.value);
+                                                    }}
                                                 />
                                             </td>
                                         );
@@ -225,7 +232,7 @@ const Gradebook = () => {
                             <th style={{ textAlign: 'left' }}>Student</th>
                             <th>Attendance (10)</th>
                             <th>Quizzes (20)</th>
-                            <th>Final (70)</th>
+                            <th>Exam Result (70)</th>
                             <th>Total Weighted Score</th>
                             <th>Status</th>
                         </tr>
@@ -259,17 +266,25 @@ const Gradebook = () => {
                         <label>Title</label>
                         <input className="form-input" style={{ width: '100%', marginBottom: 15 }} placeholder="e.g. Quiz 1" onChange={e => setNewCol({ ...newCol, title: e.target.value })} />
                         <label>Category</label>
-                        <select className="form-input" style={{ width: '100%', marginBottom: 15 }} onChange={e => setNewCol({ ...newCol, type: parseInt(e.target.value) })}>
+                        {/* UPDATED: Added Clearance & Carry (Step 1) */}
+                        <select className="form-input" style={{ width: '100%', marginBottom: 15 }} onChange={e => {
+                            const type = parseInt(e.target.value);
+                            let max = 20;
+                            if (type === 0) max = 10;
+                            if (type === 3 || type === 5 || type === 6) max = 70;
+                            setNewCol({ ...newCol, type, maxMarks: max });
+                        }}>
                             <option value={1}>Quiz (20%)</option>
                             <option value={0}>Attendance (10%)</option>
                             <option value={3}>Final Exam (70%)</option>
+                            <option value={5}>Clearance Exam (70%)</option>
+                            <option value={6}>{"Carry Exam (70 marks -> 100%)"}</option>
                         </select>
                         <label>Max Marks</label>
-                        <input type="number" className="form-input" style={{ width: '100%', marginBottom: 15 }} placeholder="20" onChange={e => setNewCol({ ...newCol, maxMarks: parseFloat(e.target.value) })} />
+                        <input type="number" value={newCol.maxMarks} className="form-input" style={{ width: '100%', marginBottom: 15 }} placeholder="20" onChange={e => setNewCol({ ...newCol, maxMarks: parseFloat(e.target.value) })} />
                         <div style={{ display: 'flex', gap: 10 }}>
                             <button onClick={async () => {
                                 try {
-                                    // UPDATED: Changed from localStorage 'token' to sessionStorage 'ACCESS_TOKEN'
                                     await axios.post(`${API_BASE}/Assessments`, { ...newCol, date: new Date().toISOString(), weightage: 0, courseId: parseInt(courseId) }, { headers: { Authorization: `Bearer ${sessionStorage.getItem('ACCESS_TOKEN')}` } });
                                     setShowAddModal(false);
                                     setRefreshKey(k => k + 1);
