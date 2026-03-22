@@ -34,7 +34,6 @@ namespace EduPulse.API.Controllers
             foreach (var student in students)
             {
                 // 2. GET ALL ENROLLMENTS (Live Check)
-                // This includes current semester courses AND any past carries they are still enrolled in
                 var allEnrollments = await _context.Enrollments
                     .Include(e => e.Course)
                     .Where(e => e.StudentId == student.Id)
@@ -50,16 +49,15 @@ namespace EduPulse.API.Controllers
                     var existingPass = await _context.CourseResults
                         .AnyAsync(cr => cr.EnrollmentId == enrollment.Id && cr.IsPassed);
 
-                    if (existingPass) continue; // If they passed it before, it's not a carry anymore.
+                    if (existingPass) continue;
 
-                    // If not passed before, calculate the LIVE result from the Gradebook
+                    // Calculate the LIVE result from the Gradebook
                     var liveResult = await _promotionService.CalculateCourseResult(enrollment.Id);
 
                     if (!liveResult.IsPassed)
                     {
                         totalActiveCarry++;
 
-                        // If the fail is in the semester we are currently reviewing
                         if (enrollment.Course.TargetSemester == semester)
                         {
                             currentSemesterFails++;
@@ -73,7 +71,6 @@ namespace EduPulse.API.Controllers
                     }
                     else if (enrollment.Course.TargetSemester == semester)
                     {
-                        // Student passed a course in the current semester
                         courseDetails.Add(new
                         {
                             CourseName = enrollment.Course.Title,
@@ -111,7 +108,6 @@ namespace EduPulse.API.Controllers
 
             foreach (var student in students)
             {
-                // Get all enrollments that aren't already marked as passed in the DB
                 var activeEnrollments = await _context.Enrollments
                     .Include(e => e.Course)
                     .Where(e => e.StudentId == student.Id)
@@ -121,7 +117,6 @@ namespace EduPulse.API.Controllers
 
                 foreach (var enrollment in activeEnrollments)
                 {
-                    // Check if already passed in history
                     var alreadyPassed = await _context.CourseResults
                         .AnyAsync(cr => cr.EnrollmentId == enrollment.Id && cr.IsPassed);
 
@@ -129,8 +124,7 @@ namespace EduPulse.API.Controllers
 
                     var result = await _promotionService.CalculateCourseResult(enrollment.Id);
 
-                    // 1. CLEAN UP OLD RECORDS: 
-                    // Set all previous results for THIS specific enrollment to NOT active carry
+                    // 1. CLEAN UP OLD RECORDS
                     var oldResults = await _context.CourseResults
                         .Where(cr => cr.EnrollmentId == enrollment.Id)
                         .ToListAsync();
@@ -139,7 +133,17 @@ namespace EduPulse.API.Controllers
                     // 2. SAVE NEW SNAPSHOT
                     _context.CourseResults.Add(result);
 
-                    if (!result.IsPassed) totalFails++;
+                    // ✅ NEW LOGIC: Mark enrollment as finished if they passed
+                    if (result.IsPassed)
+                    {
+                        enrollment.IsCompleted = true;
+                    }
+                    else
+                    {
+                        totalFails++;
+                        // Ensure it stays active for the dashboard if they failed
+                        enrollment.IsCompleted = false;
+                    }
                 }
 
                 // 3. PROMOTION LOGIC
