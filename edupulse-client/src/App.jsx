@@ -10,7 +10,7 @@ import Gradebook from './pages/Gradebook';
 import StudentGradeView from './pages/StudentGradeView';
 import AttendanceMarking from './pages/AttendanceMarking'; 
 import AttendanceSheet from './pages/AttendanceSheet';
-
+import BatchPromotion from './pages/BatchPromotion';
 function App() {
     return (
         <Router>
@@ -41,7 +41,14 @@ function App() {
                         </ProtectedRoute>
                     }
                 />
-
+                <Route
+                    path="/admin/batch-promotion"
+                    element={
+                        <ProtectedRoute requiredRole="Admin">
+                            <BatchPromotion />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route
                     path="/course-details/:id"
                     element={

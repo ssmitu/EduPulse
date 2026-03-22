@@ -86,40 +86,58 @@ const Dashboard = () => {
 
             {/* --- ADMIN SECTION --- */}
             {user.role === 'Admin' && (
-                <div className="admin-section">
-                    <h3>Pending Teacher Approvals</h3>
-                    {pendingTeachers.length === 0 ? (
-                        <p>No pending teachers to approve at this time.</p>
-                    ) : (
-                        <table className="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pendingTeachers.map(t => (
-                                    <tr key={t.id}> {/* ✅ KEY PROP IS CORRECT HERE */}
-                                        <td>{t.name}</td>
-                                        <td>{t.email}</td>
-                                        <td>
-                                            <button
-                                                onClick={() => approveTeacher(t.id)}
-                                                className="btn-approve"
-                                            >
-                                                Approve
-                                            </button>
-                                        </td>
+                <div className="admin-container">
+
+                    {/* NEW: Batch Promotion Management Card */}
+                    <div className="admin-section" style={{ marginBottom: '20px' }}>
+                        <h3>Academic Management</h3>
+                        <p style={{ color: '#666', marginBottom: '15px' }}>
+                            Review final marks and promote eligible students to the next semester.
+                        </p>
+                        <button
+                            onClick={() => navigate('/admin/batch-promotion')}
+                            className="btn-approve" // Using your existing button class
+                            style={{ backgroundColor: '#4a90e2', padding: '10px 20px', width: 'auto' }}
+                        >
+                            Launch Batch Promotion Engine
+                        </button>
+                    </div>
+
+                    {/* EXISTING: Pending Teacher Approvals Card */}
+                    <div className="admin-section">
+                        <h3>Pending Teacher Approvals</h3>
+                        {pendingTeachers.length === 0 ? (
+                            <p>No pending teachers to approve at this time.</p>
+                        ) : (
+                            <table className="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Action</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
+                                </thead>
+                                <tbody>
+                                    {pendingTeachers.map(t => (
+                                        <tr key={t.id}>
+                                            <td>{t.name}</td>
+                                            <td>{t.email}</td>
+                                            <td>
+                                                <button
+                                                    onClick={() => approveTeacher(t.id)}
+                                                    className="btn-approve"
+                                                >
+                                                    Approve
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 </div>
             )}
-
             {/* --- COURSES SECTION --- */}
             {(user.role === 'Student' || user.role === 'Teacher') && (
                 <div className="courses-section">
