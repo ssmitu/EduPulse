@@ -80,7 +80,15 @@ const TeacherCourses = () => {
                 <button
                     onClick={() => navigate('/dashboard')}
                     className="btn-action"
-                    style={{ backgroundColor: '#52796f', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                    style={{
+                        backgroundColor: '#52796f',
+                        color: 'white',  /* Added quotes here */
+                        border: 'none',
+                        padding: '10px 18px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                    }}
                 >
                     ← Back to Dashboard
                 </button>
@@ -181,7 +189,30 @@ const TeacherCourses = () => {
                                     <td style={{ fontWeight: '500' }}>{c.title}</td>
                                     <td>{c.deptName} (Y{c.year} S{c.semester})</td>
                                     <td style={{ verticalAlign: 'middle' }}>
-                                        <div className="actions-cell">
+                                        <div className="actions-cell" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+
+                                            {/* ✅ NEW: GRADEBOOK BUTTON - SHOWS ONLY IN GRADING MODE */}
+                                            {isGradingMode && (
+                                                <button
+                                                    onClick={() => navigate(`/course/${c.id}/gradebook`)}
+                                                    className="btn-primary"
+                                                    style={{
+                                                        backgroundColor: '#6b46c1',
+                                                        color: 'white',
+                                                        padding: '10px 20px',
+                                                        fontWeight: 'bold',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        width: 'auto',
+                                                        border: 'none',
+                                                        borderRadius: '6px',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    📊 Open Gradebook
+                                                </button>
+                                            )}
 
                                             {/* --- MANAGEMENT ACTIONS (HIDDEN IN GRADING MODE) --- */}
                                             {!isGradingMode && (
@@ -189,7 +220,7 @@ const TeacherCourses = () => {
                                                     <button
                                                         onClick={() => navigate(`/course-content/${c.id}`)}
                                                         className="btn-primary"
-                                                        style={{ backgroundColor: '#40916c' }}
+                                                        style={{ backgroundColor: '#40916c', width: 'auto' }}
                                                     >
                                                         📚 Course Content
                                                     </button>
@@ -197,6 +228,7 @@ const TeacherCourses = () => {
                                                     <button
                                                         onClick={() => navigate(`/attendance/${c.id}`)}
                                                         className="btn-approve"
+                                                        style={{ width: 'auto' }}
                                                     >
                                                         📅 Mark Attendance
                                                     </button>
@@ -204,21 +236,15 @@ const TeacherCourses = () => {
                                                     <button
                                                         onClick={() => navigate(`/attendance-sheet/${c.id}`)}
                                                         className="btn-primary"
-                                                        style={{ backgroundColor: '#17a2b8' }}
+                                                        style={{ backgroundColor: '#17a2b8', width: 'auto' }}
                                                     >
                                                         📋 Attendance Sheet
                                                     </button>
-                                                </>
-                                            )}
 
-                                           
-                                            {/* --- ADDITIONAL MGMT ACTIONS (HIDDEN IN GRADING MODE) --- */}
-                                            {!isGradingMode && (
-                                                <>
                                                     <button
                                                         onClick={() => handleSync(c.id)}
                                                         className="btn-secondary"
-                                                        style={{ backgroundColor: '#e9c46a', color: '#333' }}
+                                                        style={{ backgroundColor: '#e9c46a', color: '#333', width: 'auto' }}
                                                     >
                                                         🔄 Sync Batch
                                                     </button>
@@ -226,7 +252,7 @@ const TeacherCourses = () => {
                                                     <button
                                                         onClick={() => navigate(`/course-details/${c.id}`)}
                                                         className="btn-view-students"
-                                                        style={{ backgroundColor: '#52b788', color: 'white' }}
+                                                        style={{ backgroundColor: '#52b788', color: 'white', width: 'auto' }}
                                                     >
                                                         👤 View Students
                                                     </button>
