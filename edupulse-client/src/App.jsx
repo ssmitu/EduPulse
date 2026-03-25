@@ -14,8 +14,6 @@ import AttendanceSheet from './pages/AttendanceSheet';
 import BatchPromotion from './pages/BatchPromotion';
 
 // --- New IUMS Style Page Imports ---
-import StudentProfile from './pages/StudentProfile'; // The Tabbed Detailed Profile
-import ClearanceImprovement from './pages/ClearanceImprovement';
 import EnrolledCourses from './pages/EnrolledCourses';
 import Placeholder from './pages/Placeholder';
 
@@ -62,15 +60,6 @@ function App() {
                                     {/* Both Teachers and Students can view specific course materials */}
                                     <Route path="/course-content/:id" element={<CourseContent />} />
 
-                                    {/* --- Student Specific Pages --- */}
-                                    <Route
-                                        path="/student-profile"
-                                        element={
-                                            <ProtectedRoute requiredRole="Student">
-                                                <StudentProfile />
-                                            </ProtectedRoute>
-                                        }
-                                    />
                                     <Route
                                         path="/enrolled-courses"
                                         element={
@@ -79,20 +68,22 @@ function App() {
                                             </ProtectedRoute>
                                         }
                                     />
-                                    <Route
-                                        path="/clearance"
-                                        element={
-                                            <ProtectedRoute requiredRole="Student">
-                                                <ClearanceImprovement />
-                                            </ProtectedRoute>
-                                        }
-                                    />
+                               
 
                                     {/* Student Placeholders */}
                                     <Route path="/evaluation" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Teacher Evaluation" /></ProtectedRoute>} />
                                     <Route path="/results" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Results Overview" /></ProtectedRoute>} />
                                     <Route path="/payments" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Payments & History" /></ProtectedRoute>} />
                                     <Route path="/semester-fee" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Semester Fee" /></ProtectedRoute>} />
+                                    {/* Change this line */}
+                                    <Route
+                                        path="/clearance"
+                                        element={
+                                            <ProtectedRoute requiredRole="Student">
+                                                <Placeholder title="Clearance & Improvement" />
+                                            </ProtectedRoute>
+                                        }
+                                    />
 
                                     {/* Student single course result view */}
                                     <Route path="/student/result/:courseId" element={<ProtectedRoute requiredRole="Student"><StudentGradeView /></ProtectedRoute>} />

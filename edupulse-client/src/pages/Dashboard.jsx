@@ -38,10 +38,7 @@ const Dashboard = () => {
                                     <td className="iums-label">Year/ Semester</td>
                                     <td className="iums-value">{user.year}/{user.semester}</td>
                                 </tr>
-                                <tr>
-                                    <td className="iums-label">Admitted semester</td>
-                                    <td className="iums-value">Fall, 2022</td>
-                                </tr>
+                               
                             </>
                         )}
 
