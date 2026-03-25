@@ -39,10 +39,7 @@ const DashboardLayout = ({ children }) => {
                     {/* --- STUDENT SPECIFIC --- */}
                     {user.role === 'Student' && (
                         <>
-                            <NavLink to="/student-profile" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
-                                {!isCollapsed && <span className="nav-text">Student Profile</span>}
-                            </NavLink>
+                  
                             <NavLink to="/enrolled-courses" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
                                 <span className="nav-icon"></span>
                                 {!isCollapsed && <span className="nav-text">Enrolled Courses</span>}
