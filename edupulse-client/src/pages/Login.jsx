@@ -33,9 +33,7 @@ const Login = () => {
             <div className="login-form-side">
                 <div className="login-content-wrapper">
                     <div className="iums-header-branding">
-                        <div className="iums-text-box">
-                            <h1 className="iums-main-title">Integrated University Management System</h1>
-                        </div>
+                        
                     </div>
 
                     <div className="sign-in-section">
