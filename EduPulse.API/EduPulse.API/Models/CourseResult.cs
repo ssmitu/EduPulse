@@ -24,7 +24,7 @@ namespace EduPulse.API.Models
 
         // This marks if the course is currently a "Carry" that needs to be cleared
         public bool IsActiveCarryCourse { get; set; }
-
+        public string AttemptType { get; set; } = "Regular";
         public DateTime ResultPublishedAt { get; set; } = DateTime.Now;
     }
 }

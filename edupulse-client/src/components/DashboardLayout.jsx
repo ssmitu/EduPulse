@@ -65,6 +65,7 @@ const DashboardLayout = ({ children }) => {
                                 <span className="nav-icon">📝</span>
                                 {!isCollapsed && <span className="nav-text">Teacher Evaluation</span>}
                             </NavLink>
+
                         </>
                     )}
 

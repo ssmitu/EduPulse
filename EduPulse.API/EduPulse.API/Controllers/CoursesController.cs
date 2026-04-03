@@ -39,7 +39,7 @@ namespace EduPulse.API.Controllers
             if (role == "Teacher")
             {
                 var teacherCourses = await _context.Courses
-                    .Where(c => c.TeacherId == userId)
+                    .Where(c => c.TeacherId == userId && c.IsArchived == false)
                     .Include(c => c.TargetDept)
                     .Select(c => new
                     {
@@ -127,6 +127,33 @@ namespace EduPulse.API.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Course created successfully", courseId = course.Id });
+        }
+
+        // archived courses
+
+        [HttpGet("archived")]
+        public async Task<IActionResult> GetArchivedCourses()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+                return Unauthorized();
+
+            // Fetch only archived courses for this teacher
+            var archivedCourses = await _context.Courses
+                .Where(c => c.TeacherId == userId && c.IsArchived == true)
+                .Include(c => c.TargetDept)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Title,
+                    c.Code,
+                    DeptName = c.TargetDept != null ? c.TargetDept.Name : "N/A",
+                    Year = (c.TargetSemester + 1) / 2,
+                    Semester = c.TargetSemester % 2 == 0 ? 2 : 1
+                })
+                .ToListAsync();
+
+            return Ok(archivedCourses);
         }
 
         // =================================================================
