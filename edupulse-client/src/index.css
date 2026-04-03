@@ -14,13 +14,108 @@ body {
     min-height: 100vh;
     background-color: #f8fcf8;
 }
+/* ================= INSTITUTIONAL SPLIT LOGIN ================= */
 
-/* ================= AUTH (LOGIN & REGISTER) ================= */
-.auth-wrapper {
+.split-login-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    background-color: #fff;
+    margin: 0;
+    padding: 0;
+}
+
+/* Left side - The Building Image */
+.login-image-side {
+    flex: 1.6;
+    background-image: url('./assets/aust1.jpg'); /* Ensure path is correct */
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    height: 100vh;
+}
+
+.image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Subtle dark gradient to make the image look professional */
+    background: linear-gradient(to right, rgba(0,0,0,0.2), transparent);
+}
+
+/* Right side - The White Form Area */
+.login-form-side {
+    flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 80vh;
+    padding: 40px;
+    background: white;
+    height: 100vh;
+    box-sizing: border-box;
+}
+
+.login-content-wrapper {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Align text to the left as requested */
+.sign-in-heading {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 5px;
+    text-align: left;
+}
+
+.heading-underline {
+    width: 100%;
+    height: 3px;
+    background-color: #1b4332; /* Deep Green */
+    margin-bottom: 25px;
+}
+
+.iums-label {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+    display: block;
+    text-align: left;
+}
+
+.iums-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #d1d1d1;
+    background-color: #f8fafc;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+}
+
+/* ================= AUTH (LOGIN & REGISTER) ================= */
+.auth-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Made the white overlay thinner (0.2) so green balls are sharp */
+    background: linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)), url('./assets/aust1.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
 }
 
 .auth-card {
@@ -209,68 +304,111 @@ body {
         background-color: #40916c;
     }
 
-/* ================= COURSES SECTION ================= */
-.courses-section {
-    margin-top: 40px;
+/* ================= PROFESSIONAL COURSE CARDS ================= */
+.courses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+    margin-top: 20px;
 }
 
-.courses-header {
+.course-card-pro {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+    .course-card-pro:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(45, 106, 79, 0.15);
+        border-color: #40916c;
+    }
+
+.course-card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
-    .courses-header h2 {
-        color: #2d6a4f;
-        margin: 0;
-    }
-
-.courses-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
-    margin-top: 10px;
-}
-
-.course-card {
-    cursor: pointer;
-    border: 1px solid #d8f3dc;
-    color: #2d3b2d;
-    transition: all 0.2s ease;
-    padding: 20px;
-    border-radius: 12px;
-    background-color: #f0f9f4; /* subtle greenish card */
-    box-shadow: 0 2px 8px rgba(45, 106, 79, 0.06);
-}
-
-    .course-card:hover {
-        border-color: #40916c;
-        box-shadow: 0 4px 16px rgba(45, 106, 79, 0.12);
-        transform: translateY(-2px);
-    }
-
-.course-code {
+.pro-code {
+    font-weight: 800;
     color: #2d6a4f;
-    margin: 0 0 10px 0;
-    font-weight: 600;
+    font-size: 1.1rem;
+    letter-spacing: 0.5px;
 }
 
-.course-subtext {
-    font-size: 0.85em;
-    color: #52796f;
-    line-height: 1.5;
-}
-
-.course-year-sem {
-    display: inline-block;
-    font-size: 0.75em;
+.pro-tag {
+    background: #e8f5e9;
+    color: #2d6a4f;
+    font-size: 0.75rem;
     padding: 4px 10px;
     border-radius: 20px;
-    background-color: #d8f3dc;
-    color: #2d6a4f;
-    font-weight: 500;
-    margin-top: 12px;
+    font-weight: 700;
+}
+
+.pro-title {
+    font-size: 1.25rem;
+    color: #333;
+    margin-bottom: 20px;
+    height: 3em; /* Ensures alignment */
+    overflow: hidden;
+}
+
+.pro-actions-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.action-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid #f0f0f0;
+}
+
+    .action-group label {
+        width: 100%;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        color: #999;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+.btn-pro-outline {
+    flex: 1;
+    background: white;
+    border: 1px solid #40916c;
+    color: #40916c;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .btn-pro-outline:hover {
+        background: #f0fdf4;
+    }
+
+.btn-pro-solid {
+    flex: 1;
+    background: #40916c;
+    border: none;
+    color: white;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
 }
 
 /* ================= TEACHER COURSES PAGE ================= */
@@ -832,23 +970,42 @@ body {
     font-size: 0.95rem;
 }
 
-/* Main Content Area */
+/* ================= MAIN CONTENT AREA (UPDATED FOR 3D BACKGROUND) ================= */
+/* FORCE TRANSPARENCY SO PARTICLES SHOW */
+html, body, #root {
+    background-color: transparent !important;
+}
+
+.layout-wrapper {
+    background-color: transparent !important;
+}
+
 .main-viewport {
     flex-grow: 1;
-    background-color: #f0f4f1; /* Light gray-green background */
+    /* Use 0.2 opacity (80% transparent) */
+    background-color: rgba(240, 244, 241, 0.2) !important;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    position: relative;
 }
 
+/* Update your cards to be "Glass" so balls are blurry behind them */
+.user-info-card, .course-card-pro, .teacher-course-form, .admin-section {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
 .top-nav {
     height: 65px;
-    background: white;
+    /* Glass effect for top bar */
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 30px;
-    border-bottom: 1px solid #d8f3dc;
+    border-bottom: 1px solid rgba(216, 243, 220, 0.5);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -861,6 +1018,7 @@ body {
     border-radius: 20px;
     font-size: 0.8rem;
     font-weight: bold;
+    border: 1px solid #c7e9cc;
 }
 
 .top-nav-right {
@@ -878,20 +1036,33 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    box-shadow: 0 0 10px rgba(64, 145, 108, 0.3);
 }
 
 .content-area {
     padding: 30px;
     flex-grow: 1;
+    /* Ensure content stays above the background but below modals */
+    position: relative;
+    z-index: 1;
+}
+
+/* IMPORTANT: Update cards so they also have a 'Glass' feel */
+.user-info-card, .course-card-pro, .admin-section {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
 }
 
 .app-footer {
     padding: 15px 30px;
     text-align: center;
     font-size: 0.8rem;
-    color: #888;
-    background: white;
-    border-top: 1px solid #eee;
+    color: #666;
+    /* Glass Effect for footer */
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(238, 238, 238, 0.5);
 }
 
 .btn-logout-sidebar {
@@ -903,7 +1074,14 @@ body {
     border-radius: 6px;
     cursor: pointer;
     width: calc(100% - 40px);
+    font-weight: bold;
+    transition: 0.3s;
 }
+
+    .btn-logout-sidebar:hover {
+        background: #d64933;
+        transform: translateY(-2px);
+    }
 
 /* --- IUMS EXACT HOME PAGE STYLING (GREEN THEME) --- */
 
@@ -1022,35 +1200,44 @@ body {
 
 /* ================= SPLIT LOGIN PAGE STYLES ================= */
 
-/* 1. Main Container - This creates the split 60/40 screen */
-.split-login-container {
+/* ================= MAIN CONTENT AREA (REVERTED TO SOLID) ================= */
+.main-viewport {
+    flex-grow: 1;
+    background-color: #f0f4f1; /* Solid light gray-green */
     display: flex;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-    background-color: #fff;
-    margin: 0;
-    padding: 0;
+    flex-direction: column;
+    overflow-y: auto;
 }
 
-/* 2. Left side - Image side */
-.login-image-side {
-    flex: 1.6; /* Takes up about 62% */
-    background-size: cover;
-    background-position: center;
-    position: relative;
-    height: 100vh;
-}
-
-.image-overlay {
-    position: absolute;
+.top-nav {
+    height: 65px;
+    background: white; /* Solid white */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 30px;
+    border-bottom: 1px solid #d8f3dc;
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(to right, rgba(0,0,0,0.1), transparent);
+    z-index: 100;
 }
 
+/* Reset cards to solid white (Removing blur/transparency) */
+.user-info-card, .course-card-pro, .admin-section, .teacher-course-form {
+    background-color: #ffffff !important;
+    backdrop-filter: none !important;
+    border: 1px solid #d8f3dc !important;
+    box-shadow: 0 2px 8px rgba(45, 106, 79, 0.06) !important;
+}
+
+.app-footer {
+    padding: 15px 30px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #888;
+    background: white;
+    border-top: 1px solid #eee;
+}
 /* 3. Right side - Form Area */
 .login-form-side {
     flex: 1; /* Takes up about 38% */

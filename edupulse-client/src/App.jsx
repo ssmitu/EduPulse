@@ -27,9 +27,11 @@ import TeacherApprovals from './pages/TeacherApprovals';
 import ClearanceCarry from './pages/ClearanceCarry';
 import ArchivedCourses from './pages/ArchivedCourses';
 
+
 function App() {
     return (
         <Router>
+          
             <Routes>
                 {/* PUBLIC ROUTES */}
                 <Route path="/login" element={<Login />} />
