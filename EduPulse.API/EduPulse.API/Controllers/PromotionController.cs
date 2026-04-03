@@ -22,7 +22,6 @@ namespace EduPulse.API.Controllers
         [HttpGet("batch-status")]
         public async Task<IActionResult> GetBatchStatus(int departmentId, int semester)
         {
-            // 1. Get all students in this Dept and Semester
             var students = await _context.Users
                 .Where(u => u.DepartmentId == departmentId &&
                             u.CurrentSemester == semester &&
@@ -33,7 +32,6 @@ namespace EduPulse.API.Controllers
 
             foreach (var student in students)
             {
-                // 2. GET ALL ENROLLMENTS (Live Check)
                 var allEnrollments = await _context.Enrollments
                     .Include(e => e.Course)
                     .Where(e => e.StudentId == student.Id)
@@ -45,13 +43,11 @@ namespace EduPulse.API.Controllers
 
                 foreach (var enrollment in allEnrollments)
                 {
-                    // Check if this course is already finalized as a "PASS" in the database
                     var existingPass = await _context.CourseResults
                         .AnyAsync(cr => cr.EnrollmentId == enrollment.Id && cr.IsPassed);
 
                     if (existingPass) continue;
 
-                    // Calculate the LIVE result from the Gradebook
                     var liveResult = await _promotionService.CalculateCourseResult(enrollment.Id);
 
                     if (!liveResult.IsPassed)
@@ -133,7 +129,7 @@ namespace EduPulse.API.Controllers
                     // 2. SAVE NEW SNAPSHOT
                     _context.CourseResults.Add(result);
 
-                    // ✅ NEW LOGIC: Mark enrollment as finished if they passed
+                    // Mark enrollment completion
                     if (result.IsPassed)
                     {
                         enrollment.IsCompleted = true;
@@ -141,7 +137,6 @@ namespace EduPulse.API.Controllers
                     else
                     {
                         totalFails++;
-                        // Ensure it stays active for the dashboard if they failed
                         enrollment.IsCompleted = false;
                     }
                 }
@@ -153,7 +148,18 @@ namespace EduPulse.API.Controllers
                 }
             }
 
-            await _context.SaveChangesAsync();
+            // ✅ --- ARCHIVE COMPLETED COURSES ---
+            var coursesToArchive = await _context.Courses
+                .Where(c => c.TargetDeptId == departmentId && c.TargetSemester == semester)
+                .ToListAsync();
+
+            foreach (var course in coursesToArchive)
+            {
+                course.IsArchived = true;
+            }
+
+            await _context.SaveChangesAsync(); // saves everything together
+
             return Ok(new { message = $"Batch promotion completed for {students.Count} students." });
         }
     }

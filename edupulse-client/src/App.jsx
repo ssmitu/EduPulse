@@ -16,7 +16,7 @@ import BatchPromotion from './pages/BatchPromotion';
 // --- New IUMS Style Page Imports ---
 import EnrolledCourses from './pages/EnrolledCourses';
 import Placeholder from './pages/Placeholder';
-
+import StudentResultsView from './pages/StudentResultsView';
 // --- Component Imports ---
 import ProtectedRoute from './components/ProtectedRoute';
 import DashboardLayout from './components/DashboardLayout';
@@ -24,6 +24,8 @@ import DashboardLayout from './components/DashboardLayout';
 import TeacherProfile from './pages/TeacherProfile';
 import AdminProfile from './pages/AdminProfile';
 import TeacherApprovals from './pages/TeacherApprovals';
+import ClearanceCarry from './pages/ClearanceCarry';
+import ArchivedCourses from './pages/ArchivedCourses';
 
 function App() {
     return (
@@ -72,15 +74,21 @@ function App() {
 
                                     {/* Student Placeholders */}
                                     <Route path="/evaluation" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Teacher Evaluation" /></ProtectedRoute>} />
-                                    <Route path="/results" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Results Overview" /></ProtectedRoute>} />
+                                    <Route
+                                        path="/results"
+                                        element={
+                                            <ProtectedRoute requiredRole="Student">
+                                                <StudentResultsView />
+                                            </ProtectedRoute>
+                                        }
+                                    />
                                     <Route path="/payments" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Payments & History" /></ProtectedRoute>} />
                                     <Route path="/semester-fee" element={<ProtectedRoute requiredRole="Student"><Placeholder title="Semester Fee" /></ProtectedRoute>} />
-                                    {/* Change this line */}
                                     <Route
                                         path="/clearance"
                                         element={
                                             <ProtectedRoute requiredRole="Student">
-                                                <Placeholder title="Clearance & Improvement" />
+                                                <ClearanceCarry />
                                             </ProtectedRoute>
                                         }
                                     />
@@ -94,6 +102,14 @@ function App() {
                                         element={
                                             <ProtectedRoute requiredRole="Teacher">
                                                 <TeacherCourses />
+                                            </ProtectedRoute>
+                                        }
+                                    />
+                                    <Route
+                                        path="/archived-courses"
+                                        element={
+                                            <ProtectedRoute requiredRole="Teacher">
+                                                <ArchivedCourses />
                                             </ProtectedRoute>
                                         }
                                     />

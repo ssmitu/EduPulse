@@ -71,7 +71,9 @@ namespace EduPulse.API.Services
             }
 
             totalMarks = Math.Min(100, totalMarks);
-
+            string label = "Regular";
+            if (carryGrade != null) label = "Carry";
+            else if (clearanceGrade != null) label = "Clearance";
             return new CourseResult
             {
                 EnrollmentId = enrollmentId,
@@ -80,6 +82,7 @@ namespace EduPulse.API.Services
                 TotalMarks = totalMarks,
                 IsPassed = totalMarks >= 40,
                 IsActiveCarryCourse = totalMarks < 40,
+                AttemptType = label,
                 ResultPublishedAt = DateTime.Now
             };
         }

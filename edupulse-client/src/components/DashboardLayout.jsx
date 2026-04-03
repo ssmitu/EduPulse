@@ -48,22 +48,12 @@ const DashboardLayout = ({ children }) => {
                                 <span className="nav-icon"></span>
                                 {!isCollapsed && <span className="nav-text">Result</span>}
                             </NavLink>
-                            <NavLink to="/payments" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
-                                {!isCollapsed && <span className="nav-text">Payments</span>}
-                            </NavLink>
-                            <NavLink to="/semester-fee" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
-                                {!isCollapsed && <span className="nav-text">Semester Fee</span>}
-                            </NavLink>
+                            
                             <NavLink to="/clearance" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
                                 <span className="nav-icon"></span>
-                                {!isCollapsed && <span className="nav-text">Clearance/Improvement</span>}
+                                {!isCollapsed && <span className="nav-text">Clearance & Carry</span>}
                             </NavLink>
-                            <NavLink to="/evaluation" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
-                                {!isCollapsed && <span className="nav-text">Teacher Evaluation</span>}
-                            </NavLink>
+
                         </>
                     )}
 
@@ -83,8 +73,20 @@ const DashboardLayout = ({ children }) => {
                                 }
                             >
                                 <span className="nav-icon"></span>
-                                {!isCollapsed && <span className="nav-text">My Courses</span>}
+                                {!isCollapsed && <span className="nav-text">Active Courses</span>}
                             </NavLink>
+
+                            {/* Archived Courses */}
+                            <NavLink
+                                to="/archived-courses"
+                                className={({ isActive }) =>
+                                    isActive ? "nav-item active" : "nav-item"
+                                }
+                            >
+                                <span className="nav-icon"></span>
+                                {!isCollapsed && <span className="nav-text">Archived Courses</span>}
+                            </NavLink>
+
 
                             {/* Grade Results Logic */}
                             <NavLink
