@@ -25,9 +25,11 @@ import TeacherProfile from './pages/TeacherProfile';
 import AdminProfile from './pages/AdminProfile';
 import TeacherApprovals from './pages/TeacherApprovals';
 
+
 function App() {
     return (
         <Router>
+          
             <Routes>
                 {/* PUBLIC ROUTES */}
                 <Route path="/login" element={<Login />} />
