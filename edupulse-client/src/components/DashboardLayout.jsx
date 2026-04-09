@@ -57,8 +57,13 @@ const DashboardLayout = ({ children }) => {
                                 {!isCollapsed && <span className="nav-text">Semester Fee</span>}
                             </NavLink>
                             <NavLink to="/clearance" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+<<<<<<< Updated upstream
                                 <span className="nav-icon"></span>
                                 {!isCollapsed && <span className="nav-text">Clearance/Improvement</span>}
+=======
+                                <span className="nav-icon">✅</span>
+                                {!isCollapsed && <span className="nav-text">Carry/Clearance Exam</span>}
+>>>>>>> Stashed changes
                             </NavLink>
                             <NavLink to="/evaluation" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
                                 <span className="nav-icon"></span>
