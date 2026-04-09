@@ -30,75 +30,71 @@ const DashboardLayout = ({ children }) => {
                 </div>
 
                 <nav className="sidebar-menu">
-                    {/* 🏠 USER HOME (Dashboard Card) */}
-                    <NavLink to="/dashboard" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                        <span className="nav-icon"></span>
-                        {!isCollapsed && <span className="nav-text">User Home</span>}
-                    </NavLink>
+                    {/* 🏠 USER HOME - MODIFIED: Hidden for Teachers to remove duplicate home page */}
+                    {user.role !== 'Teacher' && (
+                        <NavLink to="/dashboard" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
+                            <span className="nav-icon">🏠</span>
+                            {!isCollapsed && <span className="nav-text">User Home</span>}
+                        </NavLink>
+                    )}
 
                     {/* --- STUDENT SPECIFIC --- */}
                     {user.role === 'Student' && (
                         <>
-                  
                             <NavLink to="/enrolled-courses" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">📚</span>
                                 {!isCollapsed && <span className="nav-text">Enrolled Courses</span>}
                             </NavLink>
                             <NavLink to="/results" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">📊</span>
                                 {!isCollapsed && <span className="nav-text">Result</span>}
                             </NavLink>
                             <NavLink to="/payments" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">💳</span>
                                 {!isCollapsed && <span className="nav-text">Payments</span>}
                             </NavLink>
                             <NavLink to="/semester-fee" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">💰</span>
                                 {!isCollapsed && <span className="nav-text">Semester Fee</span>}
                             </NavLink>
                             <NavLink to="/clearance" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-<<<<<<< Updated upstream
-                                <span className="nav-icon"></span>
-                                {!isCollapsed && <span className="nav-text">Clearance/Improvement</span>}
-=======
                                 <span className="nav-icon">✅</span>
-                                {!isCollapsed && <span className="nav-text">Carry/Clearance Exam</span>}
->>>>>>> Stashed changes
+                                {!isCollapsed && <span className="nav-text">Clearance/Improvement</span>}
                             </NavLink>
                             <NavLink to="/evaluation" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">📝</span>
                                 {!isCollapsed && <span className="nav-text">Teacher Evaluation</span>}
                             </NavLink>
+
                         </>
                     )}
 
                     {/* --- TEACHER SPECIFIC --- */}
                     {user.role === 'Teacher' && (
                         <>
+                            {/* For Teachers, this is their only Home Page */}
                             <NavLink to="/profile" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">👤</span>
                                 {!isCollapsed && <span className="nav-text">Teacher Profile</span>}
                             </NavLink>
 
-                            {/* My Courses Logic */}
                             <NavLink
                                 to="/teacher-courses"
                                 className={({ isActive }) =>
                                     (isActive && location.search !== '?mode=grading') ? "nav-item active" : "nav-item"
                                 }
                             >
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">🏫</span>
                                 {!isCollapsed && <span className="nav-text">My Courses</span>}
                             </NavLink>
 
-                            {/* Grade Results Logic */}
                             <NavLink
                                 to="/teacher-courses?mode=grading"
                                 className={() =>
                                     location.search === '?mode=grading' ? "nav-item active" : "nav-item"
                                 }
                             >
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">✍️</span>
                                 {!isCollapsed && <span className="nav-text">Grade Results</span>}
                             </NavLink>
                         </>
@@ -108,13 +104,11 @@ const DashboardLayout = ({ children }) => {
                     {user.role === 'Admin' && (
                         <>
                             <NavLink to="/admin/batch-promotion" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">🚀</span>
                                 {!isCollapsed && <span className="nav-text">Batch Promotion</span>}
                             </NavLink>
-
-                            {/* NEW: Teacher Approvals Link */}
                             <NavLink to="/admin/teacher-approvals" className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
-                                <span className="nav-icon"></span>
+                                <span className="nav-icon">🛡️</span>
                                 {!isCollapsed && <span className="nav-text">Teacher Approvals</span>}
                             </NavLink>
                         </>
