@@ -416,3 +416,5 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+temp_auto_push.bat
+temp_interactive_push.bat
