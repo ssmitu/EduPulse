@@ -22,10 +22,7 @@ const Dashboard = () => {
                             <td className="iums-label">Name</td>
                             <td className="iums-value">{user.name?.toUpperCase()}</td>
                         </tr>
-                        <tr>
-                            <td className="iums-label">{user.role} Id</td>
-                            <td className="iums-value">{user.email.split('@')[0]}</td>
-                        </tr>
+               
                         <tr>
                             <td className="iums-label">Dept./School</td>
                             <td className="iums-value">Department of {user.department}</td>
